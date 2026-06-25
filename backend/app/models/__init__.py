@@ -5,4 +5,5 @@ from app.models.spec import Spec
 from app.models.contract import Contract
 from app.models.contract_item import ContractItem
 from app.models.confirm_image import ConfirmImage
+from app.models.process_sheet import ProcessSheet
 from app.models.mixins import TimestampMixin, SoftDeleteMixin, AuditMixin
