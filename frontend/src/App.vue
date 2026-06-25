@@ -14,6 +14,14 @@
           <el-icon><DataBoard /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
+        <el-menu-item v-if="showContracts" index="/customers">
+          <el-icon><User /></el-icon>
+          <span>客户管理</span>
+        </el-menu-item>
+        <el-menu-item v-if="showContracts" index="/specs">
+          <el-icon><Setting /></el-icon>
+          <span>规格管理</span>
+        </el-menu-item>
         <el-menu-item v-if="showContracts" index="/contracts">
           <el-icon><Document /></el-icon>
           <span>合同管理</span>

@@ -29,6 +29,16 @@ const routes = [
     meta: { roles: ['业务员', '销售经理'] },
   },
   {
+    path: '/customers',
+    component: () => import('../views/customer/CustomerList.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
+    path: '/specs',
+    component: () => import('../views/spec/SpecList.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
     path: '/process-sheets',
     component: () => import('../views/processSheet/SheetList.vue'),
     meta: { roles: ['业务员', '销售经理', '生产专员'] },
