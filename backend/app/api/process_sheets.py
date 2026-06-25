@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.process_sheet import ProcessSheetCreate, ProcessSheetOut
 from app.services import process_sheet as service
+from app.utils.pdf_generator import render_process_sheet
 from app.dependencies import get_current_user
 from app.models.user import User
 
@@ -68,6 +70,23 @@ def dispatch(
     current_user: User = Depends(get_current_user),
 ):
     return service.dispatch_sheet(db, id, current_user.display_name or current_user.username)
+
+
+@router.get("/{id}/print")
+def print_sheet(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    sheet = service.get_sheet(db, id)
+    if not sheet:
+        raise HTTPException(status_code=404, detail="工艺单不存在")
+    pdf_bytes = render_process_sheet(sheet, sheet.contract, sheet.contract.items)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{sheet.sheet_no}.pdf"'},
+    )
 
 
 @router.delete("/{id}")
