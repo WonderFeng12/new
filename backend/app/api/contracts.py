@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.contract import ContractCreate, ContractUpdate, ContractOut
+from app.schemas.confirm_image import ConfirmImageOut, ConfirmImageFullOut
 from app.services import contract as service
+from app.services import confirm_image as confirm_service
 from app.dependencies import get_current_user
 from app.models.user import User
 
@@ -81,3 +83,36 @@ def delete(
     if not service.delete_contract(db, id):
         raise HTTPException(status_code=404, detail="合同不存在")
     return {"message": "已删除"}
+
+
+@router.post("/{id}/confirm-image", response_model=ConfirmImageOut)
+def generate_confirm(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "生产专员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return confirm_service.generate_confirm_image(db, id, current_user.display_name or current_user.username)
+
+
+@router.post("/{id}/confirm", response_model=ConfirmImageOut)
+def mark_confirm(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "生产专员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return confirm_service.mark_confirmed(db, id, current_user.display_name or current_user.username)
+
+
+@router.get("/{id}/versions", response_model=list[ConfirmImageOut])
+def version_history(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "生产专员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return confirm_service.get_versions(db, id)
