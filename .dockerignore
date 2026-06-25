@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.env
+uploads
+node_modules
+.git
+.gitignore
+README.md
+frontend/src
+frontend/node_modules
+frontend/.git
