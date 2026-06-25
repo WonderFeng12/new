@@ -4,6 +4,10 @@ const routes = [
   { path: '/login', component: () => import('../views/login/Login.vue') },
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', component: () => import('../views/dashboard/Dashboard.vue') },
+  { path: '/contracts', component: () => import('../views/contract/ContractList.vue') },
+  { path: '/contracts/new', component: () => import('../views/contract/ContractForm.vue') },
+  { path: '/contracts/:id', component: () => import('../views/contract/ContractDetail.vue') },
+  { path: '/contracts/:id/edit', component: () => import('../views/contract/ContractForm.vue') },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
