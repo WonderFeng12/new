@@ -1,0 +1,109 @@
+<h2>业务逻辑：订单 → 合同 → 工艺单 关系</h2>
+<p class="subtitle">确认图 → 合同 → 工艺单，严格递进</p>
+
+<div class="section">
+  <h3>核心流程</h3>
+  <div style="display:flex;gap:8px;align-items:center;font-size:0.85em;flex-wrap:wrap;justify-content:center;background:#f8f9fa;padding:20px;border-radius:8px;">
+    <div style="background:#fff;border:2px solid #1a73e8;padding:12px 16px;border-radius:8px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">📋 录入订单</div>
+      <div style="font-size:0.75em;color:#666;">填信息+传图片</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #f9ab00;padding:12px 16px;border-radius:8px;text-align:center;min-width:120px;">
+      <div style="font-weight:bold;">🖼️ 生成确认图</div>
+      <div style="font-size:0.75em;color:#666;">花型+关键信息<br>→ 手工发给客户</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #34a853;padding:12px 16px;border-radius:8px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">✅ 客户确认</div>
+      <div style="font-size:0.75em;color:#666;">系统中标记已确认</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #1a73e8;padding:12px 16px;border-radius:8px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">📄 生成销售合同</div>
+      <div style="font-size:0.75em;color:#666;">自动生成</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <div style="background:#ea4335;color:white;padding:12px 16px;border-radius:8px;text-align:center;min-width:120px;">
+      <div style="font-weight:bold;">📝 生成工艺单</div>
+      <div style="font-size:0.75em;opacity:0.9;">必须有合同才能创建</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:20px;margin-top:20px;">
+  <!-- 合同列表 -->
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;">
+    <div style="background:#1a73e8;color:white;padding:10px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.9em;">📄 销售合同列表</div>
+    <div style="padding:8px 14px;">
+      <div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+        <div style="flex:1;">
+          <div style="font-size:0.85em;font-weight:bold;">CON-2026-001</div>
+          <div style="font-size:0.75em;color:#666;">示例纺织 · 500米 · 已确认</div>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:0.7em;">已下推</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+        <div style="flex:1;">
+          <div style="font-size:0.85em;font-weight:bold;">CON-2026-002</div>
+          <div style="font-size:0.75em;color:#666;">锦华纺织 · 300米 · 已确认</div>
+        </div>
+        <span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;font-size:0.7em;">未下推</span>
+      </div>
+      <div style="display:flex;align-items:center;padding:8px 0;">
+        <div style="flex:1;">
+          <div style="font-size:0.85em;font-weight:bold;">CON-2026-003</div>
+          <div style="font-size:0.75em;color:#666;">宏达纺织 · 800米 · 已确认</div>
+        </div>
+        <span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;font-size:0.7em;">未下推</span>
+      </div>
+    </div>
+    <div style="padding:10px 14px;border-top:1px solid #eee;font-size:0.8em;color:#1a73e8;text-align:center;">
+      <strong>下推 →</strong> 从合同直接生成工艺单
+    </div>
+  </div>
+
+  <!-- 新建工艺单方式 -->
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;">
+    <div style="background:#ea4335;color:white;padding:10px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.9em;">📝 新建工艺单（两种方式）</div>
+    <div style="padding:14px;">
+      <div style="background:#fff8e1;border-left:4px solid #f9ab00;padding:10px;border-radius:4px;margin-bottom:12px;">
+        <div style="font-weight:bold;font-size:0.85em;">方式一：从合同下推</div>
+        <div style="font-size:0.8em;color:#555;margin-top:4px;">
+          在合同详情页点击「下推」→ 自动创建工艺单<br>
+          → 合同标记为「已下推」（不可重复下推）
+        </div>
+      </div>
+      <div style="background:#e8f5e9;border-left:4px solid #34a853;padding:10px;border-radius:4px;">
+        <div style="font-weight:bold;font-size:0.85em;">方式二：新建时选择合同</div>
+        <div style="font-size:0.8em;color:#555;margin-top:4px;">
+          在工艺单新建页面 → 下拉选择「未下推」的合同<br>
+          → 自动带入合同信息 → 补充工艺参数<br>
+          → 保存后合同自动标记「已下推」
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>数据库设计要点</h3>
+  <div style="background:#f5f5f5;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:0.85em;line-height:1.8;">
+    -- 合同表需有下推状态标记<br>
+    sales_contract {<br>
+    <span style="color:#999;">  id, order_id, contract_no, status, ...</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  is_pushed_down boolean DEFAULT FALSE,</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  process_sheet_id (nullable FK)</span><br>
+    }<br><br>
+    -- 工艺单表关联合同<br>
+    process_sheet {<br>
+    <span style="color:#999;">  id, contract_id (FK NOT NULL), ...</span><br>
+    }<br><br>
+    -- 约束：工艺单创建时，contract_id 对应的合同<br>
+    -- is_pushed_down = FALSE，创建后立即更新为 TRUE
+  </div>
+</div>
+
+<p style="margin-top:16px;">这个业务流程逻辑对吗？另外合同和工艺单的必填字段你准备好了可以告诉我，我一起整合到设计里。</p>

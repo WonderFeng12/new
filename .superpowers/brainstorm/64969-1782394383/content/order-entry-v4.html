@@ -1,0 +1,123 @@
+<h2>第1期：订单录入系统 — v4</h2>
+<p class="subtitle">花型可选 · 多格式图片支持 · 强制压缩</p>
+
+<div class="mockup">
+  <div class="mockup-header">
+    <span style="font-weight:bold;">🧵 花织管理系统</span>
+    <span style="float:right;font-size:0.85em;opacity:0.7;">用户: admin</span>
+  </div>
+  <div style="display:flex;min-height:420px;">
+    <div style="width:180px;background:#f5f5f5;padding:12px;border-right:1px solid #ddd;font-size:0.85em;">
+      <div style="padding:8px 12px;background:#e8f0fe;border-radius:4px;font-weight:bold;color:#1a73e8;">📋 订单录入</div>
+      <div style="padding:8px 12px;margin-top:4px;border-radius:4px;">📂 订单列表</div>
+      <div style="padding:8px 12px;margin-top:4px;border-radius:4px;">📄 销售合同</div>
+      <div style="padding:8px 12px;margin-top:4px;border-radius:4px;">📝 工艺单管理</div>
+      <div style="padding:8px 12px;margin-top:4px;border-radius:4px;">🏭 车间流转</div>
+    </div>
+    <div style="flex:1;padding:16px;">
+      <h3 style="margin-top:0;font-size:1.1em;">新建订单</h3>
+      <div style="display:flex;gap:16px;">
+        <div style="flex:1;">
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">客户名称 <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" value="示例纺织有限公司" style="width:100%;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">订单编号 <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" value="ORD-2026-06-001" style="width:100%;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">花型编号 <span style="color:#999;font-weight:normal;">(可选)</span></div>
+            <input class="mock-input" placeholder="可留空，后续完善" style="width:100%;color:#999;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">颜色规格 <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" placeholder="如: 红底金花" style="width:100%;">
+          </div>
+        </div>
+        <div style="flex:1;">
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">数量 (米) <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" value="500" style="width:100%;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">门幅 (cm) <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" value="280" style="width:100%;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">克重 (g/m²) <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" value="180" style="width:100%;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <div class="label" style="font-size:0.75em;">交货日期 <span style="color:#ea4335;">*</span></div>
+            <input class="mock-input" value="2026-07-25" style="width:100%;">
+          </div>
+        </div>
+      </div>
+
+      <!-- 多格式图片上传 + 强制压缩 -->
+      <div style="margin:12px 0;">
+        <div class="label" style="font-size:0.75em;">
+          花型图片
+          <span style="color:#ea4335;">*</span>
+          <span style="color:#999;font-weight:normal;margin-left:8px;">
+            支持 JPG / PNG / BMP / JPEG · 文件过大时<strong style="color:#ea4335;">自动强制压缩</strong> · 保留原始文件名
+          </span>
+        </div>
+        <div style="border:2px dashed #1a73e8;border-radius:8px;padding:16px;text-align:center;background:#e8f0fe;cursor:pointer;">
+          <span style="font-size:1.5em;display:block;">🖼️</span>
+          <span style="color:#1a73e8;font-size:0.9em;">点击选择多张图片</span>
+          <div style="font-size:0.75em;color:#666;margin-top:4px;">支持 Ctrl/Shift 多选 · 系统自动压缩至合理大小</div>
+        </div>
+        <!-- 已上传文件列表 -->
+        <div style="margin-top:8px;border:1px solid #eee;border-radius:6px;">
+          <div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid #f0f0f0;background:#fafafa;">
+            <span style="flex:1;font-size:0.85em;font-weight:bold;">已上传文件</span>
+            <span style="font-size:0.75em;color:#666;">已压缩 3/4 张</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid #f5f5f5;">
+            <span style="width:40px;height:40px;background:#e0e0e0;border-radius:4px;display:inline-block;"></span>
+            <span style="margin-left:10px;flex:1;font-size:0.85em;">富贵牡丹_红色_正面.jpg</span>
+            <span style="font-size:0.75em;color:#999;">1.2MB → <strong>340KB</strong> (压缩72%)</span>
+            <span style="color:#34a853;font-size:0.8em;margin-left:8px;">✓</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid #f5f5f5;">
+            <span style="width:40px;height:40px;background:#e0e0e0;border-radius:4px;display:inline-block;"></span>
+            <span style="margin-left:10px;flex:1;font-size:0.85em;">金玉满堂_蓝色_细节.png</span>
+            <span style="font-size:0.75em;color:#999;">3.5MB → <strong>520KB</strong> (压缩85%)</span>
+            <span style="color:#34a853;font-size:0.8em;margin-left:8px;">✓</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid #f5f5f5;">
+            <span style="width:40px;height:40px;background:#e0e0e0;border-radius:4px;display:inline-block;"></span>
+            <span style="margin-left:10px;flex:1;font-size:0.85em;">花开富贵_拼花效果.bmp</span>
+            <span style="font-size:0.75em;color:#999;">5.2MB → <strong>压缩中...</strong></span>
+            <span style="color:#f9ab00;font-size:0.8em;margin-left:8px;">⟳</span>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 12px;">
+            <span style="width:40px;height:40px;background:#e0e0e0;border-radius:4px;display:inline-block;"></span>
+            <span style="margin-left:10px;flex:1;font-size:0.85em;">图案_纹理细节.jpeg</span>
+            <span style="font-size:0.75em;color:#999;">0.8MB → <strong>210KB</strong> (压缩74%)</span>
+            <span style="color:#34a853;font-size:0.8em;margin-left:8px;">✓</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 备注 -->
+      <div style="margin:12px 0;">
+        <div class="label" style="font-size:0.75em;">备注</div>
+        <div class="mock-input" style="height:50px;padding:8px;font-size:0.85em;color:#999;border:1px solid #ddd;border-radius:4px;">客户特殊要求..."</div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #eee;">
+        <button class="mock-button" style="background:white;color:#333;">保存草稿</button>
+        <button class="mock-button" style="background:#1a73e8;color:white;border-color:#1a73e8;">生成客户确认图</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:16px;">更新内容：<br>
+① 花型编号改为「可选」，可留空<br>
+② 图片支持 JPG/PNG/BMP/JPEG，显示对应的原始格式<br>
+③ 压缩强调为"自动强制压缩"，每张显示压缩前后大小和压缩率<br>
+④ 字段加了必填标记 *，方便你后续对照合同/工艺单字段</p>

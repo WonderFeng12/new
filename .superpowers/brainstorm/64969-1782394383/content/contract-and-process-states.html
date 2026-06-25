@@ -1,0 +1,118 @@
+<h2>合同 + 工艺单 双状态流转</h2>
+<p class="subtitle">合同状态驱动工艺单，相互约束</p>
+
+<!-- 合同状态 -->
+<div class="section">
+  <h3>📄 销售合同状态</h3>
+  <div style="display:flex;gap:8px;align-items:center;font-size:0.85em;flex-wrap:wrap;justify-content:center;background:#f0f6ff;padding:20px;border-radius:8px;">
+    <div style="background:#fff;border:2px solid #f9ab00;padding:12px 20px;border-radius:8px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;font-size:1em;">📝 草稿</div>
+      <div style="font-size:0.7em;color:#666;">可编辑 ·<br>可生成确认图</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #34a853;padding:12px 20px;border-radius:8px;text-align:center;min-width:120px;">
+      <div style="font-weight:bold;font-size:1em;">✅ 客户已确认</div>
+      <div style="font-size:0.7em;color:#666;">版本锁定 ·<br>可下推工艺单</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <div style="background:#ea4335;color:white;padding:12px 20px;border-radius:8px;text-align:center;min-width:120px;">
+      <div style="font-weight:bold;font-size:1em;">🔒 已下推</div>
+      <div style="font-size:0.7em;opacity:0.9;">关联工艺单已下发<br>合同不可删</div>
+    </div>
+  </div>
+</div>
+
+<!-- 双轨对比 -->
+<div style="display:flex;gap:16px;margin-top:16px;">
+  <!-- 合同 -->
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;background:#fafafa;">
+    <div style="background:#1a73e8;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.9em;">📄 合同状态规则</div>
+    <div style="padding:12px;font-size:0.82em;">
+      <div style="margin:6px 0;padding:8px;background:#fff;border-left:3px solid #f9ab00;border-radius:4px;">
+        <strong>📝 草稿</strong><br>
+        • 合同信息可任意修改<br>
+        • 可反复生成确认图（V1, V2, V3...）<br>
+        • 可软删除<br>
+        • 不可下推工艺单
+      </div>
+      <div style="margin:6px 0;padding:8px;background:#fff;border-left:3px solid #34a853;border-radius:4px;">
+        <strong>✅ 客户已确认</strong><br>
+        • 当前版本锁定（不可修改）<br>
+        • 可下推生成工艺单<br>
+        • 可软删除（需确认无已下发工艺单）
+      </div>
+      <div style="margin:6px 0;padding:8px;background:#fff;border-left:3px solid #ea4335;border-radius:4px;">
+        <strong>🔒 已下推</strong><br>
+        • 完全锁定<br>
+        • <span style="color:#ea4335;font-weight:bold;">不可删除</span><br>
+        • 关联工艺单已下发至车间
+      </div>
+    </div>
+  </div>
+
+  <!-- 工艺单双状态对比 -->
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;background:#fafafa;">
+    <div style="background:#ea4335;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.9em;">📝 工艺单状态规则</div>
+    <div style="padding:12px;font-size:0.82em;">
+      <div style="margin:6px 0;padding:8px;background:#fff;border-left:3px solid #f9ab00;border-radius:4px;">
+        <strong>📄 保存</strong><br>
+        • 可编辑<br>
+        • 可软删除<br>
+        • 不下发
+      </div>
+      <div style="margin:6px 0;padding:8px;background:#fff;border-left:3px solid #1a73e8;border-radius:4px;">
+        <strong>✅ 确认</strong><br>
+        • 不可编辑<br>
+        • 可撤回至保存<br>
+        • 可下发
+      </div>
+      <div style="margin:6px 0;padding:8px;background:#fff;border-left:3px solid #ea4335;border-radius:4px;">
+        <strong>🚀 下发</strong><br>
+        • 只读<br>
+        • <span style="color:#ea4335;font-weight:bold;">合同变为「已下推」</span><br>
+        • 合同不可删
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 完整流程 -->
+<div class="section" style="margin-top:20px;">
+  <h3>完整状态流转图</h3>
+  <div style="font-family:monospace;font-size:0.85em;background:#f5f5f5;padding:16px;border-radius:8px;line-height:2;">
+    <span style="color:#999;">// === 合同侧 ===</span><br>
+    <span style="color:#f9ab00;">📝 合同草稿</span> ──→ (生成确认图V1) ──→ <span style="color:#f9ab00;">📝 草稿</span> ──→ (修改) ──→ <span style="color:#f9ab00;">📝 草稿</span> ──→ (生成确认图V2)<br>
+    ──→ (客户确认V2) ──→ <span style="color:#34a853;">✅ 客户已确认</span><br>
+    <span style="color:#34a853;">✅ 客户已确认</span> ──→ (下推工艺单) ──→ <span style="color:#ea4335;">🔒 已下推</span><br><br>
+    <span style="color:#999;">// === 工艺单侧 ===</span><br>
+    <span style="color:#f9ab00;">📄 保存</span> ──→ <span style="color:#1a73e8;">✅ 确认</span> ──→ <span style="color:#ea4335;">🚀 下发</span><br>
+    <span style="color:#999;">&emsp;│&emsp;&emsp;&emsp;&emsp;&emsp; ↑ ↕ 可撤回</span><br>
+    <span style="color:#999;">&emsp;│&emsp;&emsp;&emsp;&emsp;&emsp; └ 校验合同版本号是否为最新</span><br>
+    <span style="color:#999;">&emsp;└ 可软删除</span>
+  </div>
+</div>
+
+<!-- 数据库补充 -->
+<div class="section" style="margin-top:16px;">
+  <h3>数据库补充</h3>
+  <div style="background:#f5f5f5;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:0.82em;line-height:1.8;">
+    -- 合同表增加状态<br>
+    sales_contract {<br>
+    <span style="color:#999;">  id, order_id, contract_no, ...</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  status: enum('草稿', '客户已确认', '已下推'),</span><br>
+    <span style="color:#999;">  is_pushed_down boolean,</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  is_deleted boolean DEFAULT FALSE,</span><br>
+    <span style="color:#999;">  process_sheet_id, ...</span><br>
+    }<br><br>
+    -- 工艺单表增加状态<br>
+    process_sheet {<br>
+    <span style="color:#999;">  id, contract_id, confirm_version_no, confirm_image_id,</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  status: enum('保存', '确认', '下发'),</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  is_deleted boolean DEFAULT FALSE,</span><br>
+    <span style="color:#999;">  ...</span><br>
+    }<br><br>
+    -- 关键约束：工艺单「下发」→ 自动触发 合同.status = '已下推'
+  </div>
+</div>
+
+<p style="margin-top:16px;">看看合同 + 工艺单的双状态流转是否完整？没问题的话，需要你提供合同和工艺单的必填字段，然后我就写设计文档了。</p>

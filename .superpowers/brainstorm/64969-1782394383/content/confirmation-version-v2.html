@@ -1,0 +1,94 @@
+<h2>确认图版本控制 & 工艺单版本追溯</h2>
+<p class="subtitle">工艺单基于最新合同版本生成，标注来源版本</p>
+
+<div class="section">
+  <h3>完整流程</h3>
+  <div style="display:flex;gap:6px;align-items:center;font-size:0.8em;flex-wrap:wrap;background:#f8f9fa;padding:16px;border-radius:8px;justify-content:center;">
+    <div style="background:#fff;border:2px solid #1a73e8;padding:8px 12px;border-radius:6px;text-align:center;min-width:80px;">
+      <div style="font-weight:bold;">📋 订单录入</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #f9ab00;padding:8px 12px;border-radius:6px;text-align:center;min-width:110px;">
+      <div style="font-weight:bold;">🖼️ 确认图 V1</div>
+      <div style="font-size:0.7em;color:#999;">2026-06-25 10:30</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px dashed #ea4335;padding:8px 12px;border-radius:6px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">✏️ 修改合同</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #f9ab00;padding:8px 12px;border-radius:6px;text-align:center;min-width:110px;">
+      <div style="font-weight:bold;">🖼️ 确认图 V2</div>
+      <div style="font-size:0.7em;color:#999;">2026-06-25 14:15</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #34a853;padding:8px 12px;border-radius:6px;text-align:center;min-width:80px;">
+      <div style="font-weight:bold;">✅ 客户确认</div>
+      <div style="font-size:0.7em;color:#999;">基于 V2</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#ea4335;color:white;padding:8px 12px;border-radius:6px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">📝 工艺单</div>
+      <div style="font-size:0.7em;opacity:0.9;">基于合同V2生成</div>
+    </div>
+  </div>
+</div>
+
+<!-- 工艺单标注 -->
+<div style="margin-top:20px;">
+  <h3>工艺单上的版本追溯</h3>
+  <div style="border:2px solid #ea4335;border-radius:8px;padding:0;">
+    <div style="background:#ea4335;color:white;padding:10px 14px;border-radius:6px 6px 0 0;font-weight:bold;font-size:0.85em;">📝 工艺单预览</div>
+    <div style="padding:16px;">
+      <div style="font-size:0.9em;font-weight:bold;text-align:center;margin-bottom:12px;">花织有限公司 · 生产工艺单</div>
+      <div style="display:flex;gap:16px;font-size:0.82em;">
+        <div style="flex:1;">
+          <div style="margin:4px 0;"><strong>工艺单号：</strong>PRC-2026-06-001</div>
+          <div style="margin:4px 0;"><strong>合同号：</strong>CON-2026-001</div>
+          <div style="margin:4px 0;"><strong>客户：</strong>示例纺织有限公司</div>
+          <div style="margin:4px 0;"><strong>花型编号：</strong>HX-1001</div>
+          <div style="margin:4px 0;"><strong>颜色规格：</strong>红底金花</div>
+        </div>
+        <div style="flex:1;">
+          <div style="margin:4px 0;"><strong>数量：</strong>800米</div>
+          <div style="margin:4px 0;"><strong>门幅：</strong>280 cm</div>
+          <div style="margin:4px 0;"><strong>克重：</strong>200 g/m²</div>
+          <div style="margin:4px 0;"><strong>交货日期：</strong>2026-08-01</div>
+        </div>
+      </div>
+      <!-- 版本追溯标注 -->
+      <div style="margin-top:12px;padding:8px 12px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;font-size:0.8em;text-align:center;">
+        ⓘ 本工艺单基于 <strong>CON-2026-001</strong> 合同的 <strong style="color:#ea4335;">V2 版本</strong> 生成
+        <span style="color:#999;">（确认图生成时间：2026-06-25 14:15 · 客户确认时间：2026-06-26 09:30）</span>
+      </div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;font-size:0.75em;color:#999;text-align:center;">
+        打印时间：2026-06-26 10:00 &nbsp;·&nbsp; 经办人：张工
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 数据库设计补充 -->
+<div class="section" style="margin-top:20px;">
+  <h3>数据库设计补充</h3>
+  <div style="background:#f5f5f5;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:0.82em;line-height:1.8;">
+    -- 确认图版本表<br>
+    confirmation_image {<br>
+    <span style="color:#999;">  id, order_id, version_no (int),</span><br>
+    <span style="color:#999;">  generated_at (datetime), generated_by,</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  change_log (text),  -- 本次修改内容</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  is_confirmed (boolean), confirmed_at,</span><br>
+    <span style="color:#999;">  image_path, contract_snapshot (json)  -- 生成时的合同快照</span><br>
+    }<br><br>
+    -- 工艺单表<br>
+    process_sheet {<br>
+    <span style="color:#999;">  id, contract_id (FK),</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  confirm_version_no (int),  -- 基于合同的第几版确认图</span><br>
+    <span style="color:#ea4335;font-weight:bold;">  confirm_image_id (FK),      -- 关联到确认图版本</span><br>
+    <span style="color:#999;">  ...</span><br>
+    }<br><br>
+    -- 约束：工艺单生成时只能取 is_confirmed=true 的最新版本
+  </div>
+</div>
+
+<p style="margin-top:16px;">工艺单底部会清晰标注"基于合同 X 的 V2 版本生成"，包含确认图生成时间和客户确认时间，完全可追溯。</p>

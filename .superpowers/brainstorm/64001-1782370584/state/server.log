@@ -1,0 +1,5 @@
+{"type":"server-started","port":54462,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:54462","screen_dir":"/Users/wonderfeng/claude/new system/.superpowers/brainstorm/64001-1782370584/content","state_dir":"/Users/wonderfeng/claude/new system/.superpowers/brainstorm/64001-1782370584/state"}
+{"type":"screen-added","file":"/Users/wonderfeng/claude/new system/.superpowers/brainstorm/64001-1782370584/content/order-entry.html"}
+{"type":"screen-added","file":"/Users/wonderfeng/claude/new system/.superpowers/brainstorm/64001-1782370584/content/order-entry-v2.html"}
+{"type":"screen-added","file":"/Users/wonderfeng/claude/new system/.superpowers/brainstorm/64001-1782370584/content/order-entry-v3.html"}
+{"type":"server-stopped","reason":"idle timeout"}

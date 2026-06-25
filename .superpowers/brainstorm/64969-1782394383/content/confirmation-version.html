@@ -1,0 +1,126 @@
+<h2>确认图版本控制</h2>
+<p class="subtitle">每次修改可重新生成，图上带版本号和时间戳</p>
+
+<div class="section">
+  <h3>版本控制流程</h3>
+  <div style="display:flex;gap:6px;align-items:center;font-size:0.8em;flex-wrap:wrap;background:#f8f9fa;padding:16px;border-radius:8px;justify-content:center;">
+    <div style="background:#fff;border:2px solid #1a73e8;padding:8px 12px;border-radius:6px;text-align:center;min-width:80px;">
+      <div style="font-weight:bold;">📋 订单录入</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #f9ab00;padding:8px 12px;border-radius:6px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">🖼️ 生成确认图 v1</div>
+      <div style="font-size:0.7em;color:#999;">2026-06-25 10:30</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px dashed #ea4335;padding:8px 12px;border-radius:6px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">✏️ 修改合同信息</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #f9ab00;padding:8px 12px;border-radius:6px;text-align:center;min-width:100px;">
+      <div style="font-weight:bold;">🖼️ 生成确认图 v2</div>
+      <div style="font-size:0.7em;color:#999;">2026-06-25 14:15</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#fff;border:2px solid #34a853;padding:8px 12px;border-radius:6px;text-align:center;min-width:80px;">
+      <div style="font-weight:bold;">✅ 客户确认</div>
+      <div style="font-size:0.7em;color:#999;">基于 v2</div>
+    </div>
+    <span style="font-size:1.2em;color:#999;">→</span>
+    <div style="background:#ea4335;color:white;padding:8px 12px;border-radius:6px;text-align:center;min-width:80px;">
+      <div style="font-weight:bold;">📝 生成工艺单</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:16px;margin-top:20px;">
+  <!-- 确认图预览 v1 -->
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;">
+    <div style="background:#f9ab00;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.85em;">🖼️ 客户确认图 v1</div>
+    <div style="padding:12px;">
+      <div style="background:#f5f5f5;border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;margin-bottom:8px;">🖼️</div>
+        <div style="border-top:2px dashed #ccc;padding-top:12px;text-align:left;font-size:0.78em;">
+          <div style="display:flex;justify-content:space-between;">
+            <span><strong>订单号：</strong>ORD-2026-06-001</span>
+            <span><strong>客户：</strong>示例纺织</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span><strong>花型：</strong>富贵牡丹</span>
+            <span><strong>颜色：</strong>红底金花</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span><strong>数量：</strong>500米</span>
+            <span><strong>门幅：</strong>280cm</span>
+          </div>
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid #ddd;font-size:0.85em;color:#ea4335;text-align:center;">
+            <strong>版本：V1</strong> · 2026-06-25 10:30
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 确认图预览 v2 -->
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;">
+    <div style="background:#f9ab00;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.85em;">🖼️ 客户确认图 v2 ← 最新</div>
+    <div style="padding:12px;">
+      <div style="background:#f5f5f5;border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;margin-bottom:8px;">🖼️</div>
+        <div style="border-top:2px dashed #ccc;padding-top:12px;text-align:left;font-size:0.78em;">
+          <div style="display:flex;justify-content:space-between;">
+            <span><strong>订单号：</strong>ORD-2026-06-001</span>
+            <span><strong>客户：</strong>示例纺织</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span><strong>花型：</strong>富贵牡丹</span>
+            <span><strong>颜色：</strong>红底金花</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span><strong>数量：</strong><span style="color:#ea4335;font-weight:bold;">800米</span></span>
+            <span><strong>门幅：</strong>280cm</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span><strong>克重：</strong><span style="color:#ea4335;font-weight:bold;">200g/m²</span></span>
+            <span><strong>交期：</strong>2026-08-01</span>
+          </div>
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid #ddd;font-size:0.85em;color:#ea4335;text-align:center;">
+            <strong>版本：V2</strong> · 2026-06-25 14:15 · <span style="background:#fff3e0;padding:1px 6px;border-radius:4px;">修改内容：数量、克重、交期</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 版本历史 -->
+<div style="margin-top:16px;border:1px solid #ddd;border-radius:8px;">
+  <div style="background:#f5f5f5;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.85em;">📜 版本历史</div>
+  <div style="padding:8px 14px;">
+    <table style="width:100%;font-size:0.8em;border-collapse:collapse;">
+      <tr style="border-bottom:1px solid #eee;">
+        <th style="text-align:left;padding:6px 4px;">版本</th>
+        <th style="text-align:left;padding:6px 4px;">生成时间</th>
+        <th style="text-align:left;padding:6px 4px;">生成人</th>
+        <th style="text-align:left;padding:6px 4px;">修改内容</th>
+        <th style="text-align:left;padding:6px 4px;">状态</th>
+      </tr>
+      <tr style="border-bottom:1px solid #f5f5f5;">
+        <td style="padding:6px 4px;">V1</td>
+        <td style="padding:6px 4px;">2026-06-25 10:30</td>
+        <td style="padding:6px 4px;">张工</td>
+        <td style="padding:6px 4px;color:#999;">初始版本</td>
+        <td style="padding:6px 4px;"><span style="color:#999;">已过期</span></td>
+      </tr>
+      <tr>
+        <td style="padding:6px 4px;font-weight:bold;">V2</td>
+        <td style="padding:6px 4px;font-weight:bold;">2026-06-25 14:15</td>
+        <td style="padding:6px 4px;">张工</td>
+        <td style="padding:6px 4px;">数量:500→800, 克重:180→200, 交期→08-01</td>
+        <td style="padding:6px 4px;"><span style="color:#34a853;font-weight:bold;">最新</span></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<p style="margin-top:16px;">看看这样设计确认图的版本控制是否满足需求？<br>
+要点：①每次修改都可重新生成 ②图上自带版本号+日期时间 ③有版本历史可追溯 ④客户确认时锁定版本</p>

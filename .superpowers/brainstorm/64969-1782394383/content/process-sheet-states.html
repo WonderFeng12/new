@@ -1,0 +1,80 @@
+<h2>工艺单状态流转 & 业务约束</h2>
+<p class="subtitle">保存 → 确认 → 下发，严格校验，软删除</p>
+
+<div class="section">
+  <h3>工艺单状态机</h3>
+  <div style="display:flex;gap:8px;align-items:center;font-size:0.85em;flex-wrap:wrap;justify-content:center;background:#f8f9fa;padding:20px;border-radius:8px;">
+    <!-- 保存 -->
+    <div style="background:#fff;border:2px solid #f9ab00;padding:12px 20px;border-radius:8px;text-align:center;">
+      <div style="font-weight:bold;font-size:1.1em;">📄 保存</div>
+      <div style="font-size:0.75em;color:#666;">草稿状态，可编辑</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <!-- 确认 -->
+    <div style="background:#fff;border:2px solid #1a73e8;padding:12px 20px;border-radius:8px;text-align:center;">
+      <div style="font-weight:bold;font-size:1.1em;">✅ 确认</div>
+      <div style="font-size:0.75em;color:#666;">已定稿，不可编辑</div>
+    </div>
+    <span style="font-size:1.5em;color:#999;">→</span>
+    <!-- 下发 -->
+    <div style="background:#ea4335;color:white;padding:12px 20px;border-radius:8px;text-align:center;position:relative;">
+      <div style="font-weight:bold;font-size:1.1em;">🚀 下发</div>
+      <div style="font-size:0.75em;opacity:0.9;">发至车间，<br>此时锁定全部关联数据</div>
+    </div>
+  </div>
+</div>
+
+<!-- 状态约束 -->
+<div style="display:flex;gap:16px;margin-top:20px;">
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;">
+    <div style="background:#1a73e8;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.85em;">🔄 状态操作规则</div>
+    <div style="padding:12px;font-size:0.82em;">
+      <div style="margin:6px 0;">📄 <strong>保存 → 确认</strong>：自由操作</div>
+      <div style="margin:6px 0;">✅ <strong>确认 → 下发</strong>：</div>
+      <div style="margin:2px 0 6px 20px;color:#ea4335;font-weight:bold;">
+        ⚠ 必须校验合同版本号是否为最新！<br>
+        <span style="color:#666;font-weight:normal;">如合同有新版本，禁止下发，需重新生成工艺单</span>
+      </div>
+      <div style="margin:6px 0;">🚀 <strong>已下发</strong>：工艺单只读，不可修改</div>
+      <div style="margin:6px 0;">↩ <strong>确认 → 保存</strong>：可撤回修改</div>
+      <div style="margin:6px 0;color:#999;">↩ <strong>下发不可回退</strong></div>
+    </div>
+  </div>
+
+  <div style="flex:1;border:1px solid #ddd;border-radius:8px;">
+    <div style="background:#ea4335;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.85em;">🗑️ 删除规则（软删除）</div>
+    <div style="padding:12px;font-size:0.82em;">
+      <div style="margin:6px 0;padding:6px;background:#fff3e0;border-radius:4px;">
+        <strong>所有表都使用 is_deleted 字段</strong><br>
+        <span style="color:#666;font-size:0.9em;">实际数据保留，查询时过滤</span>
+      </div>
+      <div style="margin:10px 0 6px;"><strong>合同删除限制：</strong></div>
+      <div style="margin:2px 0 6px 12px;">
+        ✅ 无工艺单 → 可删除（软删除）<br>
+        ✅ 工艺单保存/确认 → 可删除（软删除，工艺单同步标记）<br>
+        <span style="color:#ea4335;font-weight:bold;">❌ 工艺单已下发 → 不允许删除合同</span>
+      </div>
+      <div style="margin:6px 0;"><strong>工艺单删除限制：</strong></div>
+      <div style="margin:2px 0 6px 12px;">
+        保存/确认中 → 可删除（软删除）<br>
+        已下发 → 不可删除
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 下发校验流程图 -->
+<div style="margin-top:20px;border:1px solid #ddd;border-radius:8px;">
+  <div style="background:#f5f5f5;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:0.85em;">🔍 下发工艺单时的校验流程</div>
+  <div style="padding:14px;font-family:monospace;font-size:0.85em;line-height:2;">
+    <span style="color:#1a73e8;">1.</span> 获取工艺单关联的合同 contract_id<br>
+    <span style="color:#1a73e8;">2.</span> 获取合同的 <strong style="color:#ea4335;">最新确认版本号</strong> (max confirmed version)<br>
+    <span style="color:#1a73e8;">3.</span> IF 工艺单的 confirm_version_no &lt; 合同最新版本号<br>
+    <span style="color:#1a73e8;">&emsp;&emsp;</span> → <span style="color:#ea4335;">禁止下发</span>，提示："合同已有新版本，请重新生成工艺单"<br>
+    <span style="color:#1a73e8;">4.</span> IF 工艺单的 confirm_version_no == 合同最新版本号<br>
+    <span style="color:#1a73e8;">&emsp;&emsp;</span> → <span style="color:#34a853;">允许下发</span>，状态变更为 已下发<br>
+    <span style="color:#1a73e8;">5.</span> 下发后 = 所有关联数据锁定（合同不可删、工艺单不可改）
+  </div>
+</div>
+
+<p style="margin-top:16px;">这样设计是否符合你的管理要求？另外合同和工艺单的必填字段你准备好了吗，我到时一并整合到设计文档里。</p>
