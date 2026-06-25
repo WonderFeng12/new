@@ -3,19 +3,56 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   { path: '/login', component: () => import('../views/login/Login.vue') },
   { path: '/', redirect: '/dashboard' },
-  { path: '/dashboard', component: () => import('../views/dashboard/Dashboard.vue') },
-  { path: '/contracts', component: () => import('../views/contract/ContractList.vue') },
-  { path: '/contracts/new', component: () => import('../views/contract/ContractForm.vue') },
-  { path: '/contracts/:id', component: () => import('../views/contract/ContractDetail.vue') },
-  { path: '/contracts/:id/edit', component: () => import('../views/contract/ContractForm.vue') },
-  { path: '/process-sheets', component: () => import('../views/processSheet/SheetList.vue') },
-  { path: '/process-sheets/:id', component: () => import('../views/processSheet/SheetDetail.vue') },
+  {
+    path: '/dashboard',
+    component: () => import('../views/dashboard/Dashboard.vue'),
+    meta: { roles: ['业务员', '销售经理', '生产专员'] },
+  },
+  {
+    path: '/contracts',
+    component: () => import('../views/contract/ContractList.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
+    path: '/contracts/new',
+    component: () => import('../views/contract/ContractForm.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
+    path: '/contracts/:id',
+    component: () => import('../views/contract/ContractDetail.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
+    path: '/contracts/:id/edit',
+    component: () => import('../views/contract/ContractForm.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
+    path: '/process-sheets',
+    component: () => import('../views/processSheet/SheetList.vue'),
+    meta: { roles: ['业务员', '销售经理', '生产专员'] },
+  },
+  {
+    path: '/process-sheets/:id',
+    component: () => import('../views/processSheet/SheetDetail.vue'),
+    meta: { roles: ['业务员', '销售经理', '生产专员'] },
+  },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  if (to.path !== '/login' && !token) next('/login')
-  else next()
+  if (to.path !== '/login' && !token) return next('/login')
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const role = payload.role
+      if (to.meta.roles && !to.meta.roles.includes(role)) {
+        return next('/dashboard')
+      }
+    } catch {}
+  }
+  next()
 })
 export default router
