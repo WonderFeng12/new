@@ -8,6 +8,8 @@ const routes = [
   { path: '/contracts/new', component: () => import('../views/contract/ContractForm.vue') },
   { path: '/contracts/:id', component: () => import('../views/contract/ContractDetail.vue') },
   { path: '/contracts/:id/edit', component: () => import('../views/contract/ContractForm.vue') },
+  { path: '/process-sheets', component: () => import('../views/processSheet/SheetList.vue') },
+  { path: '/process-sheets/:id', component: () => import('../views/processSheet/SheetDetail.vue') },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
