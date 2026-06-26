@@ -26,7 +26,6 @@ def create_spec(db: Session, data: SpecCreate, username: str):
     spec = Spec(
         length=data.length, width=data.width,
         weight=data.weight, layer_type=data.layer_type,
-        splice_method=data.splice_method or "",
         created_by=username, updated_by=username,
     )
     spec.spec_name = generate_spec_name(spec)

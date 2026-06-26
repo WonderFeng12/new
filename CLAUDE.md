@@ -140,7 +140,6 @@
 | width | VARCHAR(50) | 毛毯尺寸-宽，如 240 |
 | weight | VARCHAR(50) | 毛毯重量，如 4KG |
 | layer_type | ENUM('单层','双层','复合') | 单双层 |
-| splice_method | VARCHAR(100) | 拼接方式如 对拼接 |
 | spec_name | VARCHAR(200) | 自动生成：`长*宽/重量/层类型` 如 `200*240/4KG/单层` |
 | spec_description | TEXT | 自动生成，同 spec_name |
 

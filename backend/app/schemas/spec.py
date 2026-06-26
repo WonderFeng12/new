@@ -7,14 +7,12 @@ class SpecCreate(BaseModel):
     width: str
     weight: str
     layer_type: str
-    splice_method: Optional[str] = ""
 
 class SpecUpdate(BaseModel):
     length: Optional[str] = None
     width: Optional[str] = None
     weight: Optional[str] = None
     layer_type: Optional[str] = None
-    splice_method: Optional[str] = None
 
 class SpecOut(BaseModel):
     id: int
@@ -22,7 +20,6 @@ class SpecOut(BaseModel):
     width: str
     weight: str
     layer_type: str
-    splice_method: Optional[str] = ""
     spec_name: str
     spec_description: Optional[str] = ""
     created_by: Optional[str] = None

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="text-align:left">
     <h2>毛毯规格</h2>
     <el-card style="margin:16px 0">
       <el-row :gutter="16">
@@ -20,7 +20,6 @@
       </el-table-column>
       <el-table-column prop="weight" label="重量" width="100" />
       <el-table-column prop="layer_type" label="层类型" width="100" />
-      <el-table-column prop="splice_method" label="拼接方式" width="150" />
       <el-table-column label="操作" width="150">
         <template #default="{ row }">
           <el-button size="small" @click="editRow(row)">编辑</el-button>
@@ -55,9 +54,6 @@
             <el-radio value="复合">复合</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="拼接方式">
-          <el-input v-model="form.splice_method" placeholder="如 对拼接" />
-        </el-form-item>
         <el-form-item label="规格名称">
           <el-input :model-value="previewSpecName" disabled placeholder="自动生成" />
         </el-form-item>
@@ -81,7 +77,7 @@ const keyword = ref('')
 const showDialog = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
-const form = ref({ length: '', width: '', weight: '', layer_type: '单层', splice_method: '' })
+const form = ref({ length: '', width: '', weight: '', layer_type: '单层' })
 
 const previewSpecName = computed(() => {
   const f = form.value
@@ -94,7 +90,7 @@ async function fetchData() {
   catch {} finally { loading.value = false }
 }
 function search() { fetchData() }
-function openCreate() { editingId.value = null; form.value = { length: '', width: '', weight: '', layer_type: '单层', splice_method: '' }; showDialog.value = true }
+function openCreate() { editingId.value = null; form.value = { length: '', width: '', weight: '', layer_type: '单层' }; showDialog.value = true }
 function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
 async function handleSave() {
   saving.value = true
