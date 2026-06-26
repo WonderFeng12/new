@@ -9,6 +9,11 @@ def generate_spec_name(spec) -> str:
     return f"{spec.length}*{spec.width}/{spec.weight}/{spec.layer_type}"
 
 
+def _validate_weight(weight: str):
+    if "KG" not in weight.upper():
+        raise HTTPException(status_code=400, detail="毛毯重量必须包含 KG 单位，如 4KG")
+
+
 def list_specs(db: Session, keyword: str = ""):
     q = db.query(Spec).filter(Spec.is_deleted == False)
     if keyword:
@@ -47,13 +52,17 @@ def find_spec_by_name(db: Session, name: str):
 
 
 def create_spec(db: Session, data: SpecCreate, username: str):
+    _validate_weight(data.weight)
+    spec_name = f"{data.length}*{data.width}/{data.weight}/{data.layer_type}"
+    if find_spec_by_name(db, spec_name):
+        raise HTTPException(status_code=400, detail=f"规格 '{spec_name}' 已存在")
     spec = Spec(
         length=data.length, width=data.width,
         weight=data.weight, layer_type=data.layer_type,
         created_by=username, updated_by=username,
     )
-    spec.spec_name = generate_spec_name(spec)
-    spec.spec_description = spec.spec_name
+    spec.spec_name = spec_name
+    spec.spec_description = spec_name
     db.add(spec)
     db.commit()
     db.refresh(spec)
@@ -72,6 +81,10 @@ def update_spec(db: Session, id: int, data: SpecUpdate, username: str):
         setattr(spec, field, value)
     spec.spec_name = generate_spec_name(spec)
     spec.spec_description = spec.spec_name
+    # Check duplicate after field changes
+    existing = find_spec_by_name(db, spec.spec_name)
+    if existing and existing.id != id:
+        raise HTTPException(status_code=400, detail=f"规格 '{spec.spec_name}' 已存在")
     spec.updated_by = username
     db.commit()
     db.refresh(spec)

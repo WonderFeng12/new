@@ -13,13 +13,13 @@
       </el-row>
     </el-card>
 
-    <el-table :data="list" v-loading="loading" stripe>
-      <el-table-column prop="spec_name" label="规格名称" min-width="180" />
-      <el-table-column label="毛毯尺寸" min-width="120">
+    <el-table :data="list" v-loading="loading" stripe @sort-change="onSortChange" ref="tableRef">
+      <el-table-column prop="spec_name" label="规格名称" min-width="180" sortable="custom" />
+      <el-table-column label="毛毯尺寸" min-width="120" sortable="custom" prop="length">
         <template #default="{ row }">{{ row.length }} × {{ row.width }}</template>
       </el-table-column>
-      <el-table-column prop="weight" label="重量" width="100" />
-      <el-table-column prop="layer_type" label="层类型" width="100" />
+      <el-table-column prop="weight" label="重量" width="100" sortable="custom" />
+      <el-table-column prop="layer_type" label="层类型" width="100" sortable="custom" />
       <el-table-column label="操作" width="200">
         <template #default="{ row }">
           <el-button size="small" :disabled="row.is_in_use" @click="editRow(row)">编辑</el-button>
@@ -78,6 +78,7 @@ const keyword = ref('')
 const showDialog = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
+const tableRef = ref(null)
 const form = ref({ length: '', width: '', weight: '', layer_type: '单层' })
 
 const previewSpecName = computed(() => {
@@ -93,6 +94,19 @@ async function fetchData() {
 function search() { fetchData() }
 function openCreate() { editingId.value = null; form.value = { length: '', width: '', weight: '', layer_type: '单层' }; showDialog.value = true }
 function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
+
+let sortOrder = {}
+function onSortChange({ prop, order }) {
+  if (!order || !prop) { sortOrder = {}; return }
+  sortOrder = { prop, order }
+  const sorted = [...list.value].sort((a, b) => {
+    const va = a[prop] || '', vb = b[prop] || ''
+    const cmp = va.localeCompare(vb, 'zh-CN')
+    return order === 'ascending' ? cmp : -cmp
+  })
+  list.value = sorted
+}
+
 async function handleSave() {
   saving.value = true
   try {
