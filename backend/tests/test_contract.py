@@ -22,7 +22,7 @@ def db_session():
 def test_create_contract_with_items(db_session):
     """测试创建合同带行项目"""
     customer = Customer(name="测试客户", customer_no="C00001")
-    spec = Spec(spec_name="测试规格", weight="500g", layer_type="单层")
+    spec = Spec(length="200", width="240", weight="500g", layer_type="单层")
     db_session.add_all([customer, spec])
     db_session.commit()
 
@@ -51,7 +51,7 @@ def test_create_contract_with_items(db_session):
 def test_contract_soft_delete(db_session):
     """测试合同软删除"""
     customer = Customer(name="客户B", customer_no="C00002")
-    spec = Spec(spec_name="规格B", weight="300g", layer_type="双层")
+    spec = Spec(length="150", width="200", weight="300g", layer_type="双层")
     db_session.add_all([customer, spec])
     db_session.commit()
 
@@ -75,7 +75,7 @@ def test_contract_soft_delete(db_session):
 def test_contract_status_flow(db_session):
     """测试合同状态流转"""
     customer = Customer(name="客户C", customer_no="C00003")
-    spec = Spec(spec_name="规格C", weight="200g", layer_type="复合")
+    spec = Spec(length="100", width="150", weight="200g", layer_type="复合")
     db_session.add_all([customer, spec])
     db_session.commit()
 

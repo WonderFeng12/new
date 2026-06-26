@@ -136,11 +136,13 @@
 ### 规格 (spec) — 含 AuditMixin
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| spec_name | VARCHAR(100) | 规格名称（毛毯尺寸）如 200×240 |
+| length | VARCHAR(50) | 毛毯尺寸-长，如 200 |
+| width | VARCHAR(50) | 毛毯尺寸-宽，如 240 |
 | weight | VARCHAR(50) | 毛毯重量，如 4KG |
 | layer_type | ENUM('单层','双层','复合') | 单双层 |
 | splice_method | VARCHAR(100) | 拼接方式如 对拼接 |
-| spec_description | TEXT | 自动生成：`spec_name(weight)+(layer_type)+splice_method` |
+| spec_name | VARCHAR(200) | 自动生成：`长*宽/重量/层类型` 如 `200*240/4KG/单层` |
+| spec_description | TEXT | 自动生成，同 spec_name |
 
 ### 合同 (contract) — 含 TimestampMixin + SoftDeleteMixin + AuditMixin
 包含字段：contract_no, customer_id(FK), contract_date, spec_id(FK), spec_description, is_pressed, packaging_type, delivery_date, binding_material/width/color_no, tech_note_1~10(TEXT), accessory_desc/size/qty_1~6, pack_note_1~5, box_note_1~3, emboss_model, total_amount(DECIMAL 12,2)

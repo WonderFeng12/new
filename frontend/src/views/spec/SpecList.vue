@@ -8,17 +8,19 @@
         </el-col>
         <el-col :span="16" style="text-align:right">
           <el-button type="primary" @click="search">搜索</el-button>
-          <el-button type="success" @click="openCreate">新建规格</el-button>
+          <el-button type="success" @click="openCreate">新建毛毯规格</el-button>
         </el-col>
       </el-row>
     </el-card>
 
     <el-table :data="list" v-loading="loading" stripe>
-      <el-table-column prop="spec_name" label="规格名称" width="150" />
+      <el-table-column prop="spec_name" label="规格名称" min-width="180" />
+      <el-table-column label="毛毯尺寸" min-width="120">
+        <template #default="{ row }">{{ row.length }} × {{ row.width }}</template>
+      </el-table-column>
       <el-table-column prop="weight" label="重量" width="100" />
       <el-table-column prop="layer_type" label="层类型" width="100" />
       <el-table-column prop="splice_method" label="拼接方式" width="150" />
-      <el-table-column prop="spec_description" label="规格描述" min-width="250" />
       <el-table-column label="操作" width="150">
         <template #default="{ row }">
           <el-button size="small" @click="editRow(row)">编辑</el-button>
@@ -29,13 +31,22 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showDialog" :title="editingId ? '编辑规格' : '新建规格'" width="500px">
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="规格名称" required>
-          <el-input v-model="form.spec_name" />
-        </el-form-item>
+    <el-dialog v-model="showDialog" :title="editingId ? '编辑毛毯规格' : '新建毛毯规格'" width="520px">
+      <el-form :model="form" label-width="120px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="毛毯尺寸长" required>
+              <el-input v-model="form.length" placeholder="如 200" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="毛毯尺寸宽" required>
+              <el-input v-model="form.width" placeholder="如 240" />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="毛毯重量" required>
-          <el-input v-model="form.weight" placeholder="如 500g" />
+          <el-input v-model="form.weight" placeholder="如 4KG" />
         </el-form-item>
         <el-form-item label="层类型" required>
           <el-radio-group v-model="form.layer_type">
@@ -47,6 +58,9 @@
         <el-form-item label="拼接方式">
           <el-input v-model="form.splice_method" placeholder="如 对拼接" />
         </el-form-item>
+        <el-form-item label="规格名称">
+          <el-input :model-value="previewSpecName" disabled placeholder="自动生成" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -57,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listSpecs, createSpec, updateSpec, deleteSpec } from '../../api/spec'
 
@@ -67,7 +81,12 @@ const keyword = ref('')
 const showDialog = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
-const form = ref({ spec_name: '', weight: '', layer_type: '单层', splice_method: '' })
+const form = ref({ length: '', width: '', weight: '', layer_type: '单层', splice_method: '' })
+
+const previewSpecName = computed(() => {
+  const f = form.value
+  return f.length && f.width && f.weight ? `${f.length}*${f.width}/${f.weight}/${f.layer_type}` : ''
+})
 
 async function fetchData() {
   loading.value = true
@@ -75,7 +94,7 @@ async function fetchData() {
   catch {} finally { loading.value = false }
 }
 function search() { fetchData() }
-function openCreate() { editingId.value = null; form.value = { spec_name: '', weight: '', layer_type: '单层', splice_method: '' }; showDialog.value = true }
+function openCreate() { editingId.value = null; form.value = { length: '', width: '', weight: '', layer_type: '单层', splice_method: '' }; showDialog.value = true }
 function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
 async function handleSave() {
   saving.value = true
