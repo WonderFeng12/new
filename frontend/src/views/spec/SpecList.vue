@@ -36,17 +36,17 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="毛毯尺寸长" required>
-              <el-input v-model="form.length" placeholder="如 200" />
+              <el-input v-model="form.length" placeholder="如 200" @input="validateNumeric('length')" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="毛毯尺寸宽" required>
-              <el-input v-model="form.width" placeholder="如 240" />
+              <el-input v-model="form.width" placeholder="如 240" @input="validateNumeric('width')" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="毛毯重量" required>
-          <el-input v-model="form.weight" placeholder="如 4KG" />
+        <el-form-item label="毛毯总量(KG)" required>
+          <el-input v-model="form.weight" placeholder="如 4" @input="validateNumeric('weight')" />
         </el-form-item>
         <el-form-item label="层类型" required>
           <el-radio-group v-model="form.layer_type">
@@ -83,8 +83,12 @@ const form = ref({ length: '', width: '', weight: '', layer_type: '单层' })
 
 const previewSpecName = computed(() => {
   const f = form.value
-  return f.length && f.width && f.weight ? `${f.length}*${f.width}/${f.weight}/${f.layer_type}` : ''
+  return f.length && f.width && f.weight ? `${f.length}*${f.width}/${f.weight}KG/${f.layer_type}` : ''
 })
+
+function validateNumeric(field) {
+  form.value[field] = form.value[field].replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1')
+}
 
 async function fetchData() {
   loading.value = true
@@ -93,7 +97,11 @@ async function fetchData() {
 }
 function search() { fetchData() }
 function openCreate() { editingId.value = null; form.value = { length: '', width: '', weight: '', layer_type: '单层' }; showDialog.value = true }
-function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
+function editRow(row) {
+  editingId.value = row.id
+  form.value = { ...row, weight: row.weight.replace(/KG/i, '') }
+  showDialog.value = true
+}
 
 let sortOrder = {}
 function onSortChange({ prop, order }) {
