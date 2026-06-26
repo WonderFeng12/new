@@ -8,7 +8,7 @@
         </el-col>
         <el-col :span="16" style="text-align:right">
           <el-button type="primary" @click="search">搜索</el-button>
-          <el-button type="success" @click="showDialog = true; form={layer_type:'单层'}">新建规格</el-button>
+          <el-button type="success" @click="openCreate">新建规格</el-button>
         </el-col>
       </el-row>
     </el-card>

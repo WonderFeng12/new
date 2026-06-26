@@ -2,7 +2,7 @@
   <router-view v-if="isLogin" />
   <el-container v-else style="height:100vh">
     <el-aside width="220px" style="background:#304156">
-      <div class="logo">花织工厂管理系统</div>
+      <div class="logo">嘉元瑞通工厂管理系统</div>
       <el-menu
         :default-active="route.path"
         background-color="#304156"

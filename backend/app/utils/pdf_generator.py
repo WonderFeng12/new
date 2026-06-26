@@ -1,4 +1,8 @@
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+    HAS_WEASYPRINT = True
+except ImportError:
+    HAS_WEASYPRINT = False
 
 
 def render_process_sheet(sheet, contract, items) -> bytes:
@@ -59,7 +63,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
 </style>
 </head>
 <body>
-    <h1>花织有限公司 · 生产工艺单</h1>
+    <h1>嘉元瑞通 · 生产工艺单</h1>
     <div class="subtitle">打印日期: {contract.contract_date}</div>
 
     <table>
@@ -98,4 +102,6 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     </div>
 </body>
 </html>"""
+    if not HAS_WEASYPRINT:
+        raise RuntimeError("WeasyPrint not installed. Run: pip install weasyprint")
     return HTML(string=html).write_pdf()

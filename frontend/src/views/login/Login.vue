@@ -1,7 +1,7 @@
 <template>
   <div style="display:flex;height:100vh;align-items:center;justify-content:center;background:#f0f2f5">
     <el-card style="width:400px">
-      <h2 style="text-align:center;margin-bottom:8px;">花织工厂管理系统</h2>
+      <h2 style="text-align:center;margin-bottom:8px;">嘉元瑞通工厂管理系统</h2>
       <p style="text-align:center;color:#999;font-size:14px;margin-bottom:24px;">请登录您的账户</p>
       <el-form ref="formRef" :model="form" :rules="rules" @keyup.enter="handleLogin">
         <el-form-item prop="username">

@@ -4,7 +4,7 @@ from app.config import settings
 from app.api import auth, customers, specs, contracts, upload, process_sheets
 import os
 
-app = FastAPI(title="花织工厂管理系统", version="1.0.0")
+app = FastAPI(title="嘉元瑞通工厂管理系统", version="1.0.0")
 
 app.include_router(auth.router)
 app.include_router(customers.router)

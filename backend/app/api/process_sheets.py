@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.process_sheet import ProcessSheetCreate, ProcessSheetOut
 from app.services import process_sheet as service
-from app.utils.pdf_generator import render_process_sheet
+from app.utils.pdf_generator import render_process_sheet, HAS_WEASYPRINT
 from app.dependencies import get_current_user
 from app.models.user import User
 

@@ -1,4 +1,4 @@
-# 花织工厂管理系统 — 第1期 实施计划
+# 嘉元瑞通工厂管理系统 — 第1期 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -182,7 +182,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 import os
 
-app = FastAPI(title="花织工厂管理系统", version="1.0.0")
+app = FastAPI(title="嘉元瑞通工厂管理系统", version="1.0.0")
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
@@ -592,7 +592,7 @@ export const useUserStore = defineStore('user', {
 <template>
   <div style="display:flex;height:100vh;align-items:center;justify-content:center;background:#f0f2f5">
     <el-card style="width:400px">
-      <h2 style="text-align:center;margin-bottom:24px;">花织工厂管理系统</h2>
+      <h2 style="text-align:center;margin-bottom:24px;">嘉元瑞通工厂管理系统</h2>
       <el-form ref="formRef" :model="form" :rules="rules" @keyup.enter="handleLogin">
         <el-form-item prop="username">
           <el-input v-model="form.username" placeholder="用户名" prefix-icon="User" />
@@ -1514,7 +1514,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
       </style>
     </head>
     <body>
-      <h1>花织有限公司 · 生产工艺单</h1>
+      <h1>嘉元瑞通 · 生产工艺单</h1>
       <p>工艺单号：{sheet.sheet_no} | 合同号：{contract.contract_no}</p>
       <p>客户：{contract.customer.name}</p>
       <p>规格：{contract.spec.spec_description}</p>

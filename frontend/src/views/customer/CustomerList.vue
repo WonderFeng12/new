@@ -8,7 +8,7 @@
         </el-col>
         <el-col :span="16" style="text-align:right">
           <el-button type="primary" @click="search">搜索</el-button>
-          <el-button type="success" @click="showDialog = true; form={}">新建客户</el-button>
+          <el-button type="success" @click="openCreate">新建客户</el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -70,6 +70,7 @@ async function fetchData() {
   catch {} finally { loading.value = false }
 }
 function search() { fetchData() }
+function openCreate() { editingId.value = null; form.value = { name: '', contact: '', phone: '', address: '' }; showDialog.value = true }
 function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
 async function handleSave() {
   saving.value = true
