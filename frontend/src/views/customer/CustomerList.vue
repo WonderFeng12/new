@@ -13,17 +13,18 @@
       </el-row>
     </el-card>
 
-    <el-table :data="list" v-loading="loading" stripe>
-      <el-table-column prop="customer_no" label="客户编号" width="120" />
-      <el-table-column prop="name" label="客户名称" min-width="160" />
-      <el-table-column prop="contact" label="联系人" width="120" />
-      <el-table-column prop="phone" label="电话" width="130" />
+    <el-table :data="list" v-loading="loading" stripe @sort-change="onSortChange" ref="tableRef">
+      <el-table-column prop="customer_no" label="客户编号" width="120" sortable="custom" />
+      <el-table-column prop="name" label="客户名称" min-width="160" sortable="custom" />
+      <el-table-column prop="contact" label="联系人" width="120" sortable="custom" />
+      <el-table-column prop="phone" label="电话" width="130" sortable="custom" />
       <el-table-column prop="address" label="地址" min-width="200" />
-      <el-table-column label="操作" width="150">
+      <el-table-column label="操作" width="200">
         <template #default="{ row }">
-          <el-button size="small" @click="editRow(row)">编辑</el-button>
+          <el-button size="small" :disabled="row.is_in_use" @click="editRow(row)">编辑</el-button>
+          <el-button size="small" @click="handleClone(row)">复制</el-button>
           <el-popconfirm title="确认删除?" @confirm="handleDelete(row)">
-            <template #reference><el-button size="small" type="danger">删除</el-button></template>
+            <template #reference><el-button size="small" type="danger" :disabled="row.is_in_use">删除</el-button></template>
           </el-popconfirm>
         </template>
       </el-table-column>
@@ -63,6 +64,7 @@ const keyword = ref('')
 const showDialog = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
+const tableRef = ref(null)
 const form = ref({ name: '', contact: '', phone: '', address: '' })
 
 async function fetchData() {
@@ -73,6 +75,24 @@ async function fetchData() {
 function search() { fetchData() }
 function openCreate() { editingId.value = null; form.value = { name: '', contact: '', phone: '', address: '' }; showDialog.value = true }
 function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
+
+let sortOrder = {}
+function onSortChange({ prop, order }) {
+  if (!order || !prop) { sortOrder = {}; return }
+  sortOrder = { prop, order }
+  const sorted = [...list.value].sort((a, b) => {
+    const va = a[prop] || '', vb = b[prop] || ''
+    const cmp = va.localeCompare(vb, 'zh-CN')
+    return order === 'ascending' ? cmp : -cmp
+  })
+  list.value = sorted
+}
+
+function handleClone(row) {
+  editingId.value = null
+  form.value = { ...row }
+  showDialog.value = true
+}
 async function handleSave() {
   saving.value = true
   try {

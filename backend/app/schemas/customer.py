@@ -21,6 +21,7 @@ class CustomerOut(BaseModel):
     contact: Optional[str] = ""
     phone: Optional[str] = ""
     address: Optional[str] = ""
+    is_in_use: bool = False
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
     created_at: Optional[datetime] = None
