@@ -31,6 +31,11 @@
 ├── Dockerfile                 # 后端 Docker 镜像
 ├── docker-compose.yml         # 一键部署（MySQL + 后端 + 前端）
 ├── .dockerignore
+├── .claude/
+│   ├── settings.local.json      # 本地权限配置
+│   └── agents/                  # 测试 Agent 定义
+│       ├── spec-tester.md
+│       └── contract-tester.md
 ├── backend/
 │   ├── Dockerfile.dev         # 开发用（热重载）
 │   ├── requirements.txt
@@ -136,9 +141,9 @@
 ### 规格 (spec) — 含 AuditMixin
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| length | VARCHAR(50) | 毛毯尺寸-长，如 200 |
-| width | VARCHAR(50) | 毛毯尺寸-宽，如 240 |
-| weight | VARCHAR(50) | 毛毯重量，如 4KG |
+| length | VARCHAR(50) | 毛毯尺寸-长，如 200（必须是数字） |
+| width | VARCHAR(50) | 毛毯尺寸-宽，如 240（必须是数字） |
+| weight | VARCHAR(50) | 毛毯重量，存储如 4KG（输入纯数字，系统自动追加 KG）|
 | layer_type | ENUM('单层','双层','复合') | 单双层 |
 | spec_name | VARCHAR(200) | 自动生成：`长*宽/重量/层类型` 如 `200*240/4KG/单层` |
 | spec_description | TEXT | 自动生成，同 spec_name |
@@ -218,6 +223,10 @@
 | B010 | 上传图片强制压缩（1920px, 85% quality） | image_compress utils |
 | B011 | 业务员只能查看/编辑自己创建的合同 | contract service |
 | B012 | 金额=单价×数量，合同总金额=∑行项目金额 | contract service |
+| B013 | 规格被合同引用后不可编辑、不可删除（is_in_use） | spec service |
+| B014 | 客户被合同引用后不可编辑、不可删除（is_in_use） | customer service |
+| B015 | 重量字段输入纯数字（可含小数），系统自动追加 KG | spec service |
+| B016 | 毛毯尺寸长/宽必须是数字 | spec service |
 
 ## API 端点
 
@@ -227,18 +236,19 @@
 - `GET /me` — 获取当前用户信息
 
 ### 客户 `/api/customers`
-- `GET /api/customers?keyword=` — 客户列表（支持关键词搜索）
+- `GET /api/customers?keyword=` — 客户列表（返回 is_in_use 标记，支持排序）
 - `GET /api/customers/{id}` — 客户详情
 - `POST /api/customers` — 新建客户
-- `PUT /api/customers/{id}` — 更新客户
-- `DELETE /api/customers/{id}` — 删除客户
+- `PUT /api/customers/{id}` — 更新客户（被合同引用时拒绝）
+- `DELETE /api/customers/{id}` — 删除客户（被合同引用时拒绝）
 
 ### 规格 `/api/specs`
-- `GET /api/specs?keyword=` — 规格列表
+- `GET /api/specs?keyword=` — 规格列表（返回 is_in_use 标记）
 - `GET /api/specs/{id}` — 规格详情
-- `POST /api/specs` — 新建规格
-- `PUT /api/specs/{id}` — 更新规格
+- `POST /api/specs` — 新建规格（weight 传纯数字，系统自动加 KG）
+- `PUT /api/specs/{id}` — 更新规格（被引用时拒绝）
 - `DELETE /api/specs/{id}` — 删除规格
+- `POST /api/specs/{id}/clone` — 复制规格
 
 ### 合同 `/api/contracts`
 - `GET /api/contracts?keyword=&status=` — 合同列表（权限过滤）
