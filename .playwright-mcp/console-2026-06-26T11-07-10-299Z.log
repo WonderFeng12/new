@@ -1,0 +1,190 @@
+[     136ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/favicon.ico:0
+[   15436ms] [WARNING] [Vue warn]: Property "openCreate" was accessed during render but is not defined on instance. 
+  at <ElCol span=16 style= {text-align: right} > 
+  at <ElRow gutter=16 > 
+  at <ElCard style= {margin: 16px 0} > 
+  at <SpecList onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< null > > 
+  at <RouterView> 
+  at <ElMain style= {background: #f0f2f5, padding: 20px} > 
+  at <ElContainer> 
+  at <ElContainer key=1 style= {height: 100vh} > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-J5D6QMP7.js?v=dd906ad0:2225
+[   19841ms] [WARNING] [Vue warn]: Unhandled error during execution of component event handler 
+  at <ElPopconfirm title="确认删除?" onConfirm=fn<onConfirm> > 
+  at <TableTdWrapper style= {} class="el-table_2_column_12 el-table__cell" key="4,5"  ... > 
+  at <ElTableBody context= {uid: 267, vnode: Object, type: Object, parent: Object, appContext: Object} highlight=false row-class-name=undefined  ... > 
+  at <ElScrollbar ref_key="scrollBarRef" ref=Ref< Proxy(Object) > view-style= {display: inline-block, verticalAlign: middle}  ... > 
+  at <ElTable data= [Object, Object, Object, Object, Object, Object] stripe="" > 
+  at <CustomerList onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView> 
+  at <ElMain style= {background: #f0f2f5, padding: 20px} > 
+  at <ElContainer> 
+  at <ElContainer key=1 style= {height: 100vh} > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-J5D6QMP7.js?v=dd906ad0:2225
+[   19844ms] ReferenceError: ElMessage is not defined
+    at Proxy.handleDelete (http://localhost:5173/src/views/customer/CustomerList.vue?t=1782459778256:37:15)
+[   81720ms] [WARNING] [Vue warn]: Unhandled error during execution of component event handler 
+  at <ElPopconfirm title="确认删除?" onConfirm=fn<onConfirm> > 
+  at <TableTdWrapper style= {} class="el-table_2_column_12 el-table__cell" key="3,5"  ... > 
+  at <ElTableBody context= {uid: 267, vnode: Object, type: Object, parent: Object, appContext: Object} highlight=false row-class-name=undefined  ... > 
+  at <ElScrollbar ref_key="scrollBarRef" ref=Ref< Proxy(Object) > view-style= {display: inline-block, verticalAlign: middle}  ... > 
+  at <ElTable data= [Object, Object, Object, Object, Object] stripe="" > 
+  at <CustomerList onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView> 
+  at <ElMain style= {background: #f0f2f5, padding: 20px} > 
+  at <ElContainer> 
+  at <ElContainer key=1 style= {height: 100vh} > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-J5D6QMP7.js?v=dd906ad0:2225
+[   81723ms] ReferenceError: ElMessage is not defined
+    at Proxy.handleDelete (http://localhost:5173/src/views/customer/CustomerList.vue?t=1782459778256:37:15)
+[  438951ms] [WARNING] [Vue warn]: Unhandled error during execution of component event handler 
+  at <ElButton type="primary" onClick=fn<handleSave> loading=false > 
+  at <ElDialogContent key=0 ref_key="dialogContentRef" ref=Ref< Proxy(Object) >  ... > 
+  at <ElFocusTrap loop="" trapped=false focus-start-el="container"  ... > 
+  at <ElOverlay custom-mask-event="" mask=true overlay-class= [, el-modal-dialog, ]  ... > 
+  at <BaseTransition onAfterEnter=fn<afterEnter> onBeforeLeave=fn<beforeLeave> onAfterLeave=fn<afterLeave>  ... > 
+  at <Transition name="dialog-fade" onAfterEnter=fn<afterEnter> onBeforeLeave=fn<beforeLeave>  ... > 
+  at <ElDialog modelValue=false onUpdate:modelValue=fn title="新建客户"  ... > 
+  at <CustomerList onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView> 
+  at <ElMain style= {background: #f0f2f5, padding: 20px} > 
+  at <ElContainer> 
+  at <ElContainer key=1 style= {height: 100vh} > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-J5D6QMP7.js?v=dd906ad0:2225
+[  438953ms] ReferenceError: ElMessage is not defined
+    at handleSave (http://localhost:5173/src/views/customer/CustomerList.vue?t=1782459778256:32:17)
+[  608717ms] [WARNING] [Vue warn]: Unhandled error during execution of component event handler 
+  at <ElButton type="primary" onClick=fn<handleSave> loading=false > 
+  at <ElDialogContent key=0 ref_key="dialogContentRef" ref=Ref< Proxy(Object) >  ... > 
+  at <ElFocusTrap loop="" trapped=true focus-start-el="container"  ... > 
+  at <ElOverlay custom-mask-event="" mask=true overlay-class= [, el-modal-dialog, ]  ... > 
+  at <BaseTransition onAfterEnter=fn<afterEnter> onBeforeLeave=fn<beforeLeave> onAfterLeave=fn<afterLeave>  ... > 
+  at <Transition name="dialog-fade" onAfterEnter=fn<afterEnter> onBeforeLeave=fn<beforeLeave>  ... > 
+  at <ElDialog modelValue=true onUpdate:modelValue=fn title="编辑客户"  ... > 
+  at <CustomerList onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView> 
+  at <ElMain style= {background: #f0f2f5, padding: 20px} > 
+  at <ElContainer> 
+  at <ElContainer key=1 style= {height: 100vh} > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-J5D6QMP7.js?v=dd906ad0:2225
+[  608718ms] ReferenceError: ElMessage is not defined
+    at handleSave (http://localhost:5173/src/views/customer/CustomerList.vue?t=1782459778256:32:17)
+[  661193ms] [WARNING] [Vue warn]: Unhandled error during execution of component event handler 
+  at <ElPopconfirm title="确认删除?" onConfirm=fn<onConfirm> > 
+  at <TableTdWrapper style= {} class="el-table_2_column_12 el-table__cell" key="0,5"  ... > 
+  at <ElTableBody context= {uid: 267, vnode: Object, type: Object, parent: Object, appContext: Object} highlight=false row-class-name=undefined  ... > 
+  at <ElScrollbar ref_key="scrollBarRef" ref=Ref< Proxy(Object) > view-style= {display: inline-block, verticalAlign: middle}  ... > 
+  at <ElTable data= [Object] stripe="" > 
+  at <CustomerList onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView> 
+  at <ElMain style= {background: #f0f2f5, padding: 20px} > 
+  at <ElContainer> 
+  at <ElContainer key=1 style= {height: 100vh} > 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-J5D6QMP7.js?v=dd906ad0:2225
+[  661194ms] ReferenceError: ElMessage is not defined
+    at Proxy.handleDelete (http://localhost:5173/src/views/customer/CustomerList.vue?t=1782459778256:37:15)
+[  741863ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:559
+[  741863ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:5173/src/views/customer/CustomerList.vue?t=1782472772130:0
+[  741863ms] [ERROR] [hmr] Failed to reload /src/views/customer/CustomerList.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[  741865ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  742868ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  743873ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  744875ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  745878ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  746882ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  747885ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  748889ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  749892ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  750895ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  751899ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  752904ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  753906ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  754911ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  755914ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  756918ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  757923ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  758927ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  759931ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  760936ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  761940ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  762943ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  763947ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  764951ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  765957ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  766961ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  767965ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  768970ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  769973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  770978ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  771982ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  772986ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  773989ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  774992ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  775997ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  777001ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  778006ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  779009ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  780014ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  781017ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  782021ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  783024ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  784028ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  785032ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  786036ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  787040ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  788045ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  789049ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  790053ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  791058ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  792062ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  793065ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  794068ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  795072ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  796076ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  797080ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  798084ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  799092ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  800096ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  801100ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  802104ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  803108ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  804112ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  805116ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  806120ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  807124ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  808127ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  809131ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  810136ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  811139ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  812142ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  813146ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  814150ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  815154ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  816158ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  817161ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  818165ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  819168ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  820172ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  821176ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  822180ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  823183ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  824187ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  825191ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  826195ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  827198ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  828203ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  829207ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  830210ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  831214ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  832219ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  833222ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  834225ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  835230ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  836233ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  836748ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/api/auth/login:0
+[  837237ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  838241ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  839243ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  840246ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0
+[  840533ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/api/auth/login:0
+[  841249ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/:0

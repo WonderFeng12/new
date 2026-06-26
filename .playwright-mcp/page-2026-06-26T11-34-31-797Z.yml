@@ -1,0 +1,102 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]: 嘉元瑞通工厂管理系统
+    - menubar [ref=e6]:
+      - menuitem "仪表盘" [ref=e7] [cursor=pointer]:
+        - img [ref=e9]
+        - generic [ref=e13]: 仪表盘
+      - menuitem "客户管理" [ref=e14] [cursor=pointer]:
+        - img [ref=e16]
+        - generic [ref=e18]: 客户管理
+      - menuitem "毛毯规格" [ref=e19] [cursor=pointer]:
+        - img [ref=e21]
+        - generic [ref=e23]: 毛毯规格
+      - menuitem "合同管理" [ref=e24] [cursor=pointer]:
+        - img [ref=e26]
+        - generic [ref=e28]: 合同管理
+      - menuitem "工艺单管理" [ref=e29] [cursor=pointer]:
+        - img [ref=e31]
+        - generic [ref=e33]: 工艺单管理
+  - generic [ref=e34]:
+    - button [ref=e37] [cursor=pointer]:
+      - img [ref=e39]
+    - main [ref=e41]:
+      - generic [ref=e42]:
+        - heading "毛毯规格" [level=2] [ref=e43]
+        - generic [ref=e46]:
+          - textbox "搜索规格名称" [ref=e50]
+          - generic [ref=e52]:
+            - button "搜索" [ref=e53] [cursor=pointer]:
+              - generic [ref=e54]: 搜索
+            - button "新建规格" [ref=e55] [cursor=pointer]:
+              - generic [ref=e56]: 新建规格
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - table [ref=e60]:
+              - rowgroup [ref=e68]:
+                - row "规格名称 重量 层类型 拼接方式 规格描述 操作" [ref=e69]:
+                  - columnheader "规格名称" [ref=e70]:
+                    - generic [ref=e71]: 规格名称
+                  - columnheader "重量" [ref=e72]:
+                    - generic [ref=e73]: 重量
+                  - columnheader "层类型" [ref=e74]:
+                    - generic [ref=e75]: 层类型
+                  - columnheader "拼接方式" [ref=e76]:
+                    - generic [ref=e77]: 拼接方式
+                  - columnheader "规格描述" [ref=e78]:
+                    - generic [ref=e79]: 规格描述
+                  - columnheader "操作" [ref=e80]:
+                    - generic [ref=e81]: 操作
+            - table [ref=e86]:
+              - rowgroup [ref=e94]:
+                - row "工艺单测试规格 400g 单层 平接 工艺单测试规格+400g+(单层)+平接 编辑 删除" [ref=e95]:
+                  - cell "工艺单测试规格" [ref=e96]:
+                    - generic [ref=e97]: 工艺单测试规格
+                  - cell "400g" [ref=e98]:
+                    - generic [ref=e99]: 400g
+                  - cell "单层" [ref=e100]:
+                    - generic [ref=e101]: 单层
+                  - cell "平接" [ref=e102]:
+                    - generic [ref=e103]: 平接
+                  - cell "工艺单测试规格+400g+(单层)+平接" [ref=e104]:
+                    - generic [ref=e105]: 工艺单测试规格+400g+(单层)+平接
+                  - cell "编辑 删除" [ref=e106]:
+                    - generic [ref=e107]:
+                      - button "编辑" [ref=e108] [cursor=pointer]:
+                        - generic [ref=e109]: 编辑
+                      - button "删除" [ref=e110] [cursor=pointer]:
+                        - generic [ref=e111]: 删除
+                - row "测试规格500 500g 双层 对拼接 测试规格500+500g+(双层)+对拼接 编辑 删除" [ref=e112]:
+                  - cell "测试规格500" [ref=e113]:
+                    - generic [ref=e114]: 测试规格500
+                  - cell "500g" [ref=e115]:
+                    - generic [ref=e116]: 500g
+                  - cell "双层" [ref=e117]:
+                    - generic [ref=e118]: 双层
+                  - cell "对拼接" [ref=e119]:
+                    - generic [ref=e120]: 对拼接
+                  - cell "测试规格500+500g+(双层)+对拼接" [ref=e121]:
+                    - generic [ref=e122]: 测试规格500+500g+(双层)+对拼接
+                  - cell "编辑 删除" [ref=e123]:
+                    - generic [ref=e124]:
+                      - button "编辑" [ref=e125] [cursor=pointer]:
+                        - generic [ref=e126]: 编辑
+                      - button "删除" [ref=e127] [cursor=pointer]:
+                        - generic [ref=e128]: 删除
+                - row "500g加强 500g 复合 500g加强+500g+(复合) 编辑 删除" [ref=e129]:
+                  - cell "500g加强" [ref=e130]:
+                    - generic [ref=e131]: 500g加强
+                  - cell "500g" [ref=e132]:
+                    - generic [ref=e133]: 500g
+                  - cell "复合" [ref=e134]:
+                    - generic [ref=e135]: 复合
+                  - cell [ref=e136]
+                  - cell "500g加强+500g+(复合)" [ref=e137]:
+                    - generic [ref=e138]: 500g加强+500g+(复合)
+                  - cell "编辑 删除" [ref=e139]:
+                    - generic [ref=e140]:
+                      - button "编辑" [ref=e141] [cursor=pointer]:
+                        - generic [ref=e142]: 编辑
+                      - button "删除" [ref=e143] [cursor=pointer]:
+                        - generic [ref=e144]: 删除
+          - img [ref=e147]

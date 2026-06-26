@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h2>规格管理</h2>
+    <h2>毛毯规格</h2>
     <el-card style="margin:16px 0">
       <el-row :gutter="16">
         <el-col :span="8">
@@ -75,6 +75,7 @@ async function fetchData() {
   catch {} finally { loading.value = false }
 }
 function search() { fetchData() }
+function openCreate() { editingId.value = null; form.value = { spec_name: '', weight: '', layer_type: '单层', splice_method: '' }; showDialog.value = true }
 function editRow(row) { editingId.value = row.id; form.value = { ...row }; showDialog.value = true }
 async function handleSave() {
   saving.value = true

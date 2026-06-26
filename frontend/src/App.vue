@@ -20,7 +20,7 @@
         </el-menu-item>
         <el-menu-item v-if="showContracts" index="/specs">
           <el-icon><Setting /></el-icon>
-          <span>规格管理</span>
+          <span>毛毯规格</span>
         </el-menu-item>
         <el-menu-item v-if="showContracts" index="/contracts">
           <el-icon><Document /></el-icon>

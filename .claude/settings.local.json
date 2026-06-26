@@ -37,7 +37,17 @@
       "Bash(mysqld --initialize-insecure --user=wonderfeng)",
       "Bash(curl -s http://localhost:8000/api/health)",
       "Bash(kill 37442)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_type",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_run_code_unsafe",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_wait_for"
     ]
   }
 }
