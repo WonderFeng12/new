@@ -124,9 +124,15 @@ async function handleSave() {
   } catch (e) { ElMessage.error(e.response?.data?.detail || '保存失败') }
   finally { saving.value = false }
 }
-async function handleClone(row) {
-  try { await cloneSpec(row.id); ElMessage.success('已复制'); fetchData() }
-  catch (e) { ElMessage.error(e.response?.data?.detail || '复制失败') }
+function handleClone(row) {
+  editingId.value = null
+  form.value = {
+    length: row.length,
+    width: row.width,
+    weight: row.weight.replace(/KG/i, ''),
+    layer_type: row.layer_type,
+  }
+  showDialog.value = true
 }
 async function handleDelete(row) {
   try { await deleteSpec(row.id); ElMessage.success('已删除'); fetchData() }
