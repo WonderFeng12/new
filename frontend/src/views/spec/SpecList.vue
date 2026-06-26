@@ -20,11 +20,12 @@
       </el-table-column>
       <el-table-column prop="weight" label="重量" width="100" />
       <el-table-column prop="layer_type" label="层类型" width="100" />
-      <el-table-column label="操作" width="150">
+      <el-table-column label="操作" width="200">
         <template #default="{ row }">
-          <el-button size="small" @click="editRow(row)">编辑</el-button>
+          <el-button size="small" :disabled="row.is_in_use" @click="editRow(row)">编辑</el-button>
+          <el-button size="small" @click="handleClone(row)">复制</el-button>
           <el-popconfirm title="确认删除?" @confirm="handleDelete(row)">
-            <template #reference><el-button size="small" type="danger">删除</el-button></template>
+            <template #reference><el-button size="small" type="danger" :disabled="row.is_in_use">删除</el-button></template>
           </el-popconfirm>
         </template>
       </el-table-column>
@@ -69,7 +70,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listSpecs, createSpec, updateSpec, deleteSpec } from '../../api/spec'
+import { listSpecs, createSpec, updateSpec, deleteSpec, cloneSpec } from '../../api/spec'
 
 const list = ref([])
 const loading = ref(false)
@@ -100,6 +101,10 @@ async function handleSave() {
     showDialog.value = false; editingId.value = null; fetchData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '保存失败') }
   finally { saving.value = false }
+}
+async function handleClone(row) {
+  try { await cloneSpec(row.id); ElMessage.success('已复制'); fetchData() }
+  catch (e) { ElMessage.error(e.response?.data?.detail || '复制失败') }
 }
 async function handleDelete(row) {
   try { await deleteSpec(row.id); ElMessage.success('已删除'); fetchData() }

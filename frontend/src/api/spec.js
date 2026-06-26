@@ -5,3 +5,4 @@ export function getSpec(id) { return api.get(`/specs/${id}`) }
 export function createSpec(data) { return api.post('/specs', data) }
 export function updateSpec(id, data) { return api.put(`/specs/${id}`, data) }
 export function deleteSpec(id) { return api.delete(`/specs/${id}`) }
+export function cloneSpec(id) { return api.post(`/specs/${id}/clone`) }

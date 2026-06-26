@@ -22,6 +22,7 @@ class SpecOut(BaseModel):
     layer_type: str
     spec_name: str
     spec_description: Optional[str] = ""
+    is_in_use: bool = False
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
 

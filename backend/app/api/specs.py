@@ -28,6 +28,10 @@ def update(id: int, data: SpecUpdate, db: Session = Depends(get_db), current_use
     if not result: raise HTTPException(404, "规格不存在")
     return result
 
+@router.post("/{id}/clone", response_model=SpecOut)
+def clone(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return service.clone_spec(db, id, current_user.display_name or current_user.username)
+
 @router.delete("/{id}")
 def delete(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not service.delete_spec(db, id): raise HTTPException(404, "规格不存在")
