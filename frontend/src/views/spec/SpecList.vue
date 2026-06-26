@@ -58,6 +58,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { listSpecs, createSpec, updateSpec, deleteSpec } from '../../api/spec'
 
 const list = ref([])

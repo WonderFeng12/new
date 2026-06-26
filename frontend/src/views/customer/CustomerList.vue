@@ -54,6 +54,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { listCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../api/customer'
 
 const list = ref([])
