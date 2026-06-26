@@ -30,7 +30,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showDialog" :title="editingId ? '编辑毛毯规格' : '新建毛毯规格'" width="520px">
+    <el-dialog v-model="showDialog" :title="editingId ? '编辑毛毯规格' : '新建毛毯规格'" width="520px" style="text-align:left">
       <el-form :model="form" label-width="120px">
         <el-row :gutter="16">
           <el-col :span="12">
