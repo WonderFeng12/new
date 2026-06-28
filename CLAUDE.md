@@ -4,7 +4,7 @@
 
 嘉元瑞通工厂订单管理系统，分三期实施。第1期为 Web 端订单录入系统，已实现从订单录入→客户确认→合同生成→工艺单下发的完整闭环。
 
-- **第1期（已完成）**：Web 页面订单录入系统
+- **第1期（已完成）**：Web 页面订单录入系统（含公开确认链接）
 - **第2期（规划中）**：微信小程序 — 客户自主选花型、下单
 - **第3期（规划中）**：工厂内部协同 — 库存管理、信息共享
 
@@ -56,7 +56,8 @@
 │       │   ├── contract.py
 │       │   ├── contract_item.py
 │       │   ├── confirm_image.py
-│       │   └── process_sheet.py
+│       │   ├── process_sheet.py
+│       │   └── basic_data.py  # 基础数据（颜色映射、包装方式等）
 │       ├── schemas/           # Pydantic 校验/序列化
 │       │   ├── user.py
 │       │   ├── customer.py
@@ -64,21 +65,25 @@
 │       │   ├── contract.py
 │       │   ├── contract_item.py
 │       │   ├── confirm_image.py
-│       │   └── process_sheet.py
+│       │   ├── process_sheet.py
+│       │   └── basic_data.py
 │       ├── services/          # 业务逻辑层
 │       │   ├── auth.py        # 认证、JWT 生成/验证
 │       │   ├── customer.py    # 客户 CRUD + 编号生成
 │       │   ├── spec.py        # 规格 CRUD + 描述自动生成
 │       │   ├── contract.py    # 合同 CRUD + 金额计算 + 权限过滤
 │       │   ├── confirm_image.py # 确认图版本控制
-│       │   └── process_sheet.py # 工艺单 CRUD + 下推 + 版本校验
+│       │   ├── process_sheet.py # 工艺单 CRUD + 下推 + 版本校验
+│       │   └── basic_data.py    # 基础数据 CRUD + 颜色映射查询
 │       ├── api/               # 路由层
 │       │   ├── auth.py
 │       │   ├── customers.py
 │       │   ├── specs.py
 │       │   ├── contracts.py
 │       │   ├── process_sheets.py
-│       │   └── upload.py
+│       │   ├── upload.py
+│       │   ├── basic_data.py  # 基础数据 CRUD
+│       │   └── public.py     # 公开端点（客户确认链接，无需登录）
 │       └── utils/
 │           ├── image_compress.py # Pillow 图片压缩
 │           └── pdf_generator.py  # WeasyPrint PDF 生成
@@ -96,6 +101,7 @@
 │       │   ├── contract.js
 │       │   ├── upload.js
 │       │   └── processSheet.js
+│       │   └── basicData.js
 │       ├── store/
 │       │   └── user.js        # Pinia store（token、user、role）
 │       ├── router/
@@ -114,6 +120,10 @@
 │           └── processSheet/
 │               ├── SheetList.vue
 │               └── SheetDetail.vue
+│           ├── basicData/
+│           │   └── BasicDataList.vue
+│           └── public/
+│               └── ConfirmPage.vue  # 客户公开确认页面（无需登录）
 ```
 
 ## 数据库模型
@@ -148,24 +158,45 @@
 | spec_name | VARCHAR(200) | 自动生成：`长*宽/重量/层类型` 如 `200*240/4KG/单层` |
 | spec_description | TEXT | 自动生成，同 spec_name |
 
+### 基础数据 (basic_data) — 含 TimestampMixin
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK | |
+| category | VARCHAR(50) | 分类：color_mapping（颜色映射）、packaging_type（包装方式）|
+| code | VARCHAR(100) | 代码/键（颜色名称或包装方式名称）|
+| value | VARCHAR(200) | 值（如包边色号）|
+| sort_order | INT | 排序号 |
+
 ### 合同 (contract) — 含 TimestampMixin + SoftDeleteMixin + AuditMixin
-包含字段：contract_no, customer_id(FK), contract_date, spec_id(FK), spec_description, is_pressed, packaging_type, delivery_date, binding_material/width/color_no, tech_note_1~10(TEXT), accessory_desc/size/qty_1~6, pack_note_1~5, box_note_1~3, emboss_model, total_amount(DECIMAL 12,2)
+包含字段：contract_no, customer_id(FK), contract_date, spec_id(FK, nullable — 遗留字段，已废弃), delivery_date, binding_material/width/color_no, tech_note_1~10(TEXT), accessory_desc/size/qty_1~6, pack_note_1~5, box_note_1~3, emboss_model, total_amount(DECIMAL 12,2)
+
+> 毛毯规格(spec_id)、是否压花(is_pressed)、包装方式(packaging_type) 已移至行项目(contract_item)级别。
 
 状态字段：
 - **status**: ENUM('草稿','保存','已下发')，默认草稿
 - **is_pushed_down**: BOOLEAN 是否已下推工艺单
 - **push_down_sheet_id**: INT 关联工艺单 ID
 - **latest_confirm_version**: INT 最新确认图版本号
+- **confirm_token**: VARCHAR(36) UNIQUE NULL — UUID 公开确认链接令牌
+- **customer_comment**: TEXT NULL — 客户通过公开确认链接提交的意见
 
 ### 合同行项目 (contract_item)
 | 字段 | 说明 |
 |------|------|
 | line_no | 行号 |
+| spec_id(FK) | 关联毛毯规格主数据 |
+| is_pressed | 是否压花 |
+| packaging_type | 包装方式（纸箱/抽真空/压缩包/打卷面料）|
+| delivery_date | 交期（行级别）|
+| pattern_count | 花型数量 |
+| pattern_data(JSON) | 花型详细数据，每项含 code/color/binding_color_no/image/qty 字段 |
 | unit_price / qty / amount | 价格信息（amount = unit_price × qty）|
 | pattern_code | 花型编号 |
 | color_a / color_b | A/B 面颜色 |
 | image_a_1~3 / image_b_1~3 | A/B 面图片路径（最多各3张）|
 | remark | 备注 |
+
+> 工艺备注(tech_note_1~10)、辅料包边(accessory_desc/size/qty_1~6、binding_*)、包装箱单(pack_note_1~5、box_note_1~3) 在合同级别定义，行项目明细弹窗中引用。
 
 ### 确认图版本 (confirm_image)
 | 字段 | 说明 |
@@ -223,10 +254,16 @@
 | B010 | 上传图片强制压缩（1920px, 85% quality） | image_compress utils |
 | B011 | 业务员只能查看/编辑自己创建的合同 | contract service |
 | B012 | 金额=单价×数量，合同总金额=∑行项目金额 | contract service |
-| B013 | 规格被合同引用后不可编辑、不可删除（is_in_use） | spec service |
+| B013 | 规格被合同或合同行项目引用后不可编辑、不可删除（is_in_use） | spec service（检查 ContractItem.spec_id + Contract.spec_id） |
 | B014 | 客户被合同引用后不可编辑、不可删除（is_in_use） | customer service |
 | B015 | 重量字段输入纯数字（可含小数），系统自动追加 KG | spec service |
 | B016 | 毛毯尺寸长/宽必须是数字 | spec service |
+| B017 | 行项目工艺单说明自动生成：`规格名称+经编印花+压花/空+毛毯-包装方式` | ContractForm.vue（前端 computed） |
+| B018 | 花型数量自动分配：总数÷花型个数取整，余数归第一个花型 | ContractForm.vue（前端 distributeQty） |
+| B019 | 花型用量(m) = 花型数量 × 10.56，数量为0时显示空白 | ContractForm.vue（前端 template） |
+| B020 | 技术要求说明1 自动生成格式：`1.请注意尺寸和重量控制 长*宽/重量 正负{公差}`，数据从首行规格读取 | ContractForm.vue（前端 computed + watcher） |
+| B021 | 公开确认链接生成 UUID 令牌，客户无需登录即可查看合同并提交确认意见 | contract service + public API |
+| B022 | 客户通过公开链接确认后，customer_comment 记录意见，合同变更为「保存」，生成确认图版本 | public.py → confirm_image service |
 
 ## API 端点
 
@@ -260,9 +297,21 @@
 - `POST /api/contracts/{id}/confirm-image` — 生成确认图
 - `POST /api/contracts/{id}/confirm` — 标记客户确认
 - `GET /api/contracts/{id}/versions` — 确认图版本历史
+- `POST /api/contracts/{id}/generate-confirm-link` — 生成公开确认链接（UUID 令牌）
+
+### 基础数据 `/api/basic-data`
+- `GET /api/basic-data/{category}` — 按分类列出基础数据项
+- `POST /api/basic-data/{category}` — 新建基础数据项
+- `PUT /api/basic-data/{category}/{id}` — 更新基础数据项
+- `DELETE /api/basic-data/{category}/{id}` — 删除基础数据项
+- `GET /api/basic-data/mapping/color` — 获取颜色→包边色号映射字典
 
 ### 图片上传 `/api/upload`
 - `POST /api/upload/images` — 上传图片（多文件、自动压缩）
+
+### 公开接口 `/api/public`（无需 JWT 认证）
+- `GET /api/public/contract/{token}` — 通过令牌获取合同详情（含行项目、花型图片），返回 `already_confirmed` 标记
+- `POST /api/public/confirm/{token}` — 客户通过链接提交确认意见，状态变为「保存」，记录 customer_comment
 
 ### 工艺单 `/api/process-sheets`
 - `GET /api/process-sheets?keyword=` — 工艺单列表
@@ -294,11 +343,11 @@
 ### 完整流程
 ```
 1. 创建客户 → 创建规格
-2. 新建合同（填写基本信息、工艺备注、辅料、包装箱单、行项目）
+2. 新建合同（填写基本信息、行项目，每行可打开明细弹窗设置花型/颜色/技术要求/辅料包边/包装箱单）
 3. 上传花型图片（自动压缩）
 4. 生成确认图V1（系统自动分配版本号）
-5. 发送确认图给客户确认（线下：微信/邮件）
-6. 标记客户已确认（合同→保存，版本锁定）
+5. 生成公开确认链接（UUID 令牌），发送给客户（微信/邮件）
+6. 客户打开链接查看合同详情、花型图片，提交意见并确认（合同→保存，版本锁定，记录客户意见）
 7. 下推工艺单（合同→已下发，创建工艺单→草稿）
 8. 确认工艺单（工艺单→保存）
 9. 下发工艺单（工艺单→已下发，校验合同版本）
@@ -313,6 +362,29 @@
 - 每张确认图记录生成时间、操作人、修改日志
 - 标记确认基于最新版本
 - 工艺单生成时记录基于哪个版本
+
+## 图片存储策略
+
+### 当前方案（第1期）
+- **存储位置**：本地服务器 `backend/uploads/` 目录
+- **处理流程**：上传 → Pillow 强制压缩（最长边 1920px, 85% quality）→ 存入 uploads 目录 → 数据库记录 URL 路径
+- **前端访问**：Nginx 反向代理 `/uploads/` → `http://backend:8000/uploads/`
+- **适用场景**：工厂内部使用，图片量级不大（合同花型图，年几千张），当前方案足够
+
+### 未来方案（第2期规划）
+目标：迁移至云对象存储（OSS），解决磁盘空间顾虑，并为微信小程序提供 CDN 加速。
+
+**流程设计：**
+```
+上传 → 计算 SHA256 文件指纹 → 以 hash 为文件名存 OSS → 
+数据库只存 hash 和 URL → 天然去重，同一图片多人上传只存一份
+```
+
+**优势：**
+- **去重存储**：文件指纹（SHA256）作为文件名，相同图片不重复存储
+- **CDN 加速**：微信小程序加载图片更快
+- **无磁盘压力**：按量付费，无需手动清理
+- **迁移时机**：第2期微信小程序上线时实施，当前保持本地存储
 
 ## 本地开发
 

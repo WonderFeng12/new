@@ -8,3 +8,4 @@ export function confirmSheet(id) { return api.put(`/process-sheets/${id}/confirm
 export function dispatchSheet(id) { return api.post(`/process-sheets/${id}/dispatch`) }
 export function printSheet(id) { return api.get(`/process-sheets/${id}/print`, { responseType: 'blob' }) }
 export function deleteSheet(id) { return api.delete(`/process-sheets/${id}`) }
+export function updateSheetDetail(id, data) { return api.put(`/process-sheets/${id}/detail`, data) }

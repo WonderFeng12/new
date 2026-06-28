@@ -50,9 +50,7 @@
         </el-form-item>
         <el-form-item label="层类型" required>
           <el-radio-group v-model="form.layer_type">
-            <el-radio value="单层">单层</el-radio>
-            <el-radio value="双层">双层</el-radio>
-            <el-radio value="复合">复合</el-radio>
+            <el-radio v-for="lt in layerTypes" :key="lt.code" :value="lt.code">{{ lt.code }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="规格名称">
@@ -71,6 +69,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listSpecs, createSpec, updateSpec, deleteSpec, cloneSpec } from '../../api/spec'
+import { listBasicData } from '../../api/basicData'
 
 const list = ref([])
 const loading = ref(false)
@@ -80,6 +79,7 @@ const editingId = ref(null)
 const saving = ref(false)
 const tableRef = ref(null)
 const form = ref({ length: '', width: '', weight: '', layer_type: '单层' })
+const layerTypes = ref([])
 
 const previewSpecName = computed(() => {
   const f = form.value
@@ -138,5 +138,11 @@ async function handleDelete(row) {
   try { await deleteSpec(row.id); ElMessage.success('已删除'); fetchData() }
   catch (e) { ElMessage.error(e.response?.data?.detail || '删除失败') }
 }
-onMounted(fetchData)
+
+async function loadLayerTypes() {
+  try { const res = await listBasicData('layer_type'); layerTypes.value = res.data || [] }
+  catch { /* ignore */ }
+}
+
+onMounted(() => { fetchData(); loadLayerTypes() })
 </script>

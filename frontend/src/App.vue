@@ -38,7 +38,7 @@
           <el-icon><Tools /></el-icon>
           <span>基础数据</span>
         </el-menu-item>
-        <el-menu-item v-if="showContracts" index="/process-steps">
+        <el-menu-item v-if="store.role === '销售经理' || store.role === '生产专员'" index="/process-steps">
           <el-icon><Setting /></el-icon>
           <span>工序管理</span>
         </el-menu-item>

@@ -1,7 +1,7 @@
 <template>
   <div>
     <h2>企业微信通知设置</h2>
-    <el-card style="margin:16px 0;max-width:600px">
+    <el-card v-loading="loading" style="margin:16px 0;max-width:600px">
       <el-form label-width="160px">
         <el-form-item label="群机器人 Webhook URL">
           <el-input v-model="form.webhook_url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
@@ -21,7 +21,9 @@
       <el-table-column prop="role" label="角色" width="100" />
       <el-table-column label="企业微信 UserID" min-width="200">
         <template #default="{ row }">
-          <el-input v-model="row.wecom_userid" size="small" placeholder="未绑定" @change="handleUpdateWecom(row)" />
+          <el-input v-model="row.wecom_userid" size="small" placeholder="未绑定" readonly>
+            <template #append><span style="font-size:12px;color:#999">用户自行绑定</span></template>
+          </el-input>
         </template>
       </el-table-column>
     </el-table>
@@ -51,11 +53,12 @@ async function handleSave() {
 }
 
 async function handleUpdateWecom(user) {
-  // WeCom binding is done by each user via the /users/me/wecom endpoint
-  // This shows current binding status for reference
 }
 
+const loading = ref(false)
+
 async function loadData() {
+  loading.value = true
   try {
     const [sRes, uRes] = await Promise.all([
       getWecomSettings(),
@@ -65,6 +68,7 @@ async function loadData() {
     form.value.notify_enabled = sRes.data.production_notify_enabled === 'true'
     users.value = uRes.data
   } catch { ElMessage.error('加载失败') }
+  finally { loading.value = false }
 }
 
 onMounted(loadData)
