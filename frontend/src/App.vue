@@ -14,6 +14,14 @@
           <el-icon><DataBoard /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
+        <el-menu-item v-if="showContracts" index="/contracts">
+          <el-icon><Document /></el-icon>
+          <span>合同管理</span>
+        </el-menu-item>
+        <el-menu-item index="/process-sheets">
+          <el-icon><List /></el-icon>
+          <span>工艺单管理</span>
+        </el-menu-item>
         <el-menu-item v-if="showContracts" index="/customers">
           <el-icon><User /></el-icon>
           <span>客户管理</span>
@@ -22,13 +30,13 @@
           <el-icon><Setting /></el-icon>
           <span>毛毯规格</span>
         </el-menu-item>
-        <el-menu-item v-if="showContracts" index="/contracts">
-          <el-icon><Document /></el-icon>
-          <span>合同管理</span>
+        <el-menu-item v-if="showContracts" index="/basic-data">
+          <el-icon><Tools /></el-icon>
+          <span>基础数据</span>
         </el-menu-item>
-        <el-menu-item index="/process-sheets">
-          <el-icon><List /></el-icon>
-          <span>工艺单管理</span>
+        <el-menu-item v-if="showContracts" index="/process-steps">
+          <el-icon><Setting /></el-icon>
+          <span>工序管理</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -63,7 +71,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
 
-const isLogin = computed(() => route.path === '/login')
+const isLogin = computed(() => route.path === '/login' || route.path.startsWith('/confirm/'))
 const showContracts = computed(() => store.role !== '生产专员')
 
 function handleCommand(cmd) {

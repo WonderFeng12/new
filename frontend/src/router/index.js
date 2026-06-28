@@ -48,10 +48,25 @@ const routes = [
     component: () => import('../views/processSheet/SheetDetail.vue'),
     meta: { roles: ['业务员', '销售经理', '生产专员'] },
   },
+  {
+    path: '/confirm/:token',
+    component: () => import('../views/public/ConfirmPage.vue'),
+  },
+  {
+    path: '/basic-data',
+    component: () => import('../views/basicData/BasicDataList.vue'),
+    meta: { roles: ['业务员', '销售经理'] },
+  },
+  {
+    path: '/process-steps',
+    component: () => import('../views/processStep/ProcessStepList.vue'),
+    meta: { roles: ['销售经理', '生产专员'] },
+  },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
 router.beforeEach((to, from, next) => {
+  if (to.path.startsWith('/confirm/')) return next()
   const token = localStorage.getItem('token')
   if (to.path !== '/login' && !token) return next('/login')
   if (token) {
