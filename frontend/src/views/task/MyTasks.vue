@@ -11,7 +11,7 @@
           <el-tag v-if="row.production_status === 'yarn_plan'" type="info">坯布计划已下达</el-tag>
           <el-tag v-else-if="row.production_status === 'weaving'" type="warning">织造中</el-tag>
           <el-tag v-else-if="row.production_status === 'cancelled'" type="danger">已取消</el-tag>
-          <el-tag v-else type="success">{{ row.production_status }}</el-tag>
+          <el-tag v-else :type="statusTagType(row.production_status)">{{ statusLabel(row.production_status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140">
@@ -36,6 +36,27 @@ import { ElMessage } from 'element-plus'
 
 const tasks = ref([])
 const loading = ref(false)
+
+const statusMap = {
+  yarn_plan: '坯布计划已下达',
+  weaving: '织造中',
+  setting: '定型中',
+  brushing: '刷毛烫光中',
+  printing: '印花中',
+  sewing: '成品缝制中',
+  completed: '成品完成',
+  cancelled: '已取消',
+}
+
+function statusLabel(code) {
+  return statusMap[code] || code
+}
+
+function statusTagType(code) {
+  if (code === 'cancelled') return 'danger'
+  if (code === 'completed') return 'success'
+  return 'warning'
+}
 
 async function handleAdvance(row) {
   try {
