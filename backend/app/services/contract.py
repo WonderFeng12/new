@@ -6,6 +6,7 @@ from sqlalchemy.orm import defaultload
 from app.schemas.contract import ContractCreate, ContractUpdate
 from app.schemas.contract_item import ContractItemCreate
 from fastapi import HTTPException
+from app.services.production import item_has_process_sheet
 
 
 def _parse_code_rule(value: str) -> dict:
@@ -102,6 +103,8 @@ def list_contracts(
     ).all()
     for c in contracts:
         c.computed_status = compute_contract_status(db, c.id, c.items)
+        for item in c.items:
+            item.has_process_sheet = item_has_process_sheet(db, item.id)
     return contracts
 
 
@@ -115,6 +118,8 @@ def get_contract(db: Session, id: int):
     ).first()
     if contract:
         contract.computed_status = compute_contract_status(db, contract.id, contract.items)
+        for item in contract.items:
+            item.has_process_sheet = item_has_process_sheet(db, item.id)
     return contract
 
 

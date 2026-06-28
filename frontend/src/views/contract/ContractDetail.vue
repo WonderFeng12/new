@@ -54,13 +54,14 @@
             <span v-else style="color:#999">待坯布计划</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="320" fixed="right">
+        <el-table-column label="操作" width="440" fixed="right">
           <template #default="{ row }">
             <el-button size="small" v-if="canReleaseYarn(row)" @click="openYarnDialog(row)">下达坯布</el-button>
             <el-button size="small" type="primary" v-if="canAdvance(row)" @click="openAdvanceDialog(row)">推进</el-button>
             <el-button size="small" v-if="canRollback(row)" @click="openRollbackDialog(row)">回退</el-button>
             <el-button size="small" type="danger" v-if="canCancel(row)" @click="openCancelDialog(row)">取消</el-button>
             <el-button size="small" @click="openLogDialog(row)">日志</el-button>
+            <el-button size="small" type="primary" v-if="canPushDown(row)" @click="handlePushDownItem(row)">下推工艺单</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -178,7 +179,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getContract, getVersions, manualConfirm } from '../../api/contract'
 import { pushDownFromContract } from '../../api/processSheet'
-import { listProcessSteps, advanceItem, rollbackItem, cancelItem, releaseYarnPlan, getItemLogs, getContractLogs } from '../../api/production'
+import { listProcessSteps, advanceItem, rollbackItem, cancelItem, releaseYarnPlan, getItemLogs, getContractLogs, pushDownItem } from '../../api/production'
 import { listUsers } from '../../api/user'
 
 const route = useRoute()
@@ -282,6 +283,23 @@ function canRollback(row) {
 function canCancel(row) {
   const role = userRole.value
   return (role === '销售经理' || role === '生产专员' || role === '业务员') && row.production_status !== 'cancelled'
+}
+
+function canPushDown(row) {
+  const role = userRole.value
+  if (role !== '销售经理' && role !== '生产专员') return false
+  if (contract.value?.status !== '确认') return false
+  return !row.has_process_sheet
+}
+
+async function handlePushDownItem(row) {
+  dialogLoading.value = true
+  try {
+    await pushDownItem(row.id)
+    ElMessage.success('工艺单已下推')
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '下推失败') }
+  finally { dialogLoading.value = false }
 }
 
 // --- Dialogs ---

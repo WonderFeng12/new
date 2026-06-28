@@ -47,6 +47,29 @@ class ContractItemUpdate(BaseModel):
     remark: Optional[str] = None
 
 
+class ContractItemUpdateWithId(BaseModel):
+    id: Optional[int] = None
+    spec_id: int
+    line_no: int
+    is_pressed: Optional[bool] = False
+    packaging_type: Optional[str] = ""
+    delivery_date: Optional[date] = None
+    pattern_count: Optional[int] = 0
+    pattern_data: Optional[list[dict[str, Any]]] = None
+    unit_price: Optional[float] = None
+    qty: Optional[float] = None
+    pattern_code: Optional[str] = ""
+    color_a: Optional[str] = ""
+    image_a_1: Optional[str] = ""
+    image_a_2: Optional[str] = ""
+    image_a_3: Optional[str] = ""
+    color_b: Optional[str] = ""
+    image_b_1: Optional[str] = ""
+    image_b_2: Optional[str] = ""
+    image_b_3: Optional[str] = ""
+    remark: Optional[str] = ""
+
+
 class ContractItemOut(BaseModel):
     id: int
     contract_id: int
@@ -76,6 +99,7 @@ class ContractItemOut(BaseModel):
     cancel_quantities: Optional[Any] = None
     cancel_reason: Optional[str] = None
     yarn_plan_user_name: Optional[str] = None
+    has_process_sheet: Optional[bool] = False
 
     class Config:
         from_attributes = True

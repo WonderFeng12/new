@@ -11,6 +11,7 @@ export function rollbackItem(id, data) { return api.post(`/contract-items/${id}/
 export function reworkItem(id, data) { return api.post(`/contract-items/${id}/rework`, data) }
 export function cancelItem(id, data) { return api.post(`/contract-items/${id}/cancel`, data) }
 export function releaseYarnPlan(id, data) { return api.post(`/contract-items/${id}/yarn-plan`, data) }
+export function pushDownItem(id) { return api.post(`/contract-items/${id}/push-down`, {}) }
 
 export function getItemLogs(id) { return api.get(`/contract-items/${id}/logs`) }
 export function getContractLogs(id) { return api.get(`/contracts/${id}/production-logs`) }
