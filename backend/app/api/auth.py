@@ -39,17 +39,3 @@ def register(req: UserCreate, db: Session = Depends(get_db)):
 def me(current_user: User = Depends(get_current_user)):
     return UserOut.model_validate(current_user)
 
-
-@router.get("/users")
-def list_users(db: Session = Depends(get_db)):
-    users = db.query(User).filter(User.is_deleted == False).all()
-    return [
-        {
-            "id": u.id,
-            "display_name": u.display_name,
-            "role": u.role,
-            "wecom_userid": u.wecom_userid,
-            "username": u.username,
-        }
-        for u in users
-    ]

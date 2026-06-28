@@ -286,3 +286,21 @@ def update_my_wecom(
     current_user.wecom_userid = data.get("wecom_userid", "")
     db.commit()
     return {"ok": True}
+
+
+# ── User list (for assignee selection) ──
+
+
+@router.get("/users")
+def list_users(db: Session = Depends(get_db)):
+    users = db.query(User).filter(User.is_deleted == False).all()
+    return [
+        {
+            "id": u.id,
+            "display_name": u.display_name,
+            "role": u.role,
+            "wecom_userid": u.wecom_userid,
+            "username": u.username,
+        }
+        for u in users
+    ]
