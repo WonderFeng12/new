@@ -36,6 +36,7 @@ class ContractItem(Base):
 
     spec = relationship("Spec")
     contract = relationship("Contract", back_populates="items")
+    yarn_plan_user = relationship("User", foreign_keys=[yarn_plan_user_id])
 
     @property
     def spec_description(self):
