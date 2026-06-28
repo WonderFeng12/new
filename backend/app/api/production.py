@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -112,6 +112,10 @@ class YarnPlanRequest(BaseModel):
     remark: Optional[str] = ""
 
 
+class PushDownRequest(BaseModel):
+    pass
+
+
 @router.post("/contract-items/{id}/advance")
 def advance_item(
     id: int,
@@ -165,6 +169,21 @@ def release_yarn_plan(
 ):
     item, log = prod_service.release_yarn_plan(db, id, current_user.id, req.yarn_plan_user_id, req.remark)
     return {"message": "坯布计划已下达", "production_status": item.production_status}
+
+
+@router.post("/contract-items/{id}/push-down")
+def push_down_item(
+    id: int,
+    data: PushDownRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ("销售经理", "生产专员"):
+        raise HTTPException(status_code=403, detail="权限不足")
+    result = prod_service.push_down_item_to_process_sheet(db, id, current_user.id)
+    if not result:
+        raise HTTPException(status_code=400, detail="下推失败")
+    return {"message": "工艺单已下推", "sheet_no": result.sheet_no, "sheet_id": result.id}
 
 
 @router.get("/contract-items/{id}/logs")

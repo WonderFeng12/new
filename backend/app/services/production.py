@@ -5,6 +5,8 @@ from fastapi import HTTPException
 from app.models.contract import Contract
 from app.models.contract_item import ContractItem
 from app.models.production_log import ProductionLog
+from app.models.process_sheet import ProcessSheet
+from app.models.process_sheet_item import ProcessSheetItem
 from app.models.process_step import ProcessStep
 from app.models.user import User
 from app.services.process_step import get_ordered_step_codes
@@ -290,3 +292,94 @@ def get_my_tasks(db: Session, user_id: int):
         joinedload(ContractItem.contract),
         joinedload(ContractItem.spec),
     ).order_by(ContractItem.id.desc()).all()
+
+
+def push_down_item_to_process_sheet(db: Session, item_id: int, user_id: int):
+    """行项目下推为工艺单。"""
+    item = db.query(ContractItem).filter(ContractItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="行项目不存在")
+
+    contract = db.query(Contract).filter(Contract.id == item.contract_id).first()
+    if not contract or contract.is_deleted:
+        raise HTTPException(status_code=404, detail="合同不存在")
+    if contract.status == "草稿":
+        raise HTTPException(status_code=400, detail="合同未确认，无法下推")
+
+    # Check if this item already has a process sheet item
+    existing = db.query(ProcessSheetItem).filter(
+        ProcessSheetItem.contract_item_id == item_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="该行项目已下推工艺单")
+
+    # Find existing process sheet for this contract, or create one
+    sheet = db.query(ProcessSheet).filter(
+        ProcessSheet.contract_id == contract.id,
+        ProcessSheet.is_deleted == False,
+    ).first()
+    if not sheet:
+        from datetime import date
+        today = date.today()
+        seq = db.query(ProcessSheet).count() + 1
+        sheet = ProcessSheet(
+            contract_id=contract.id,
+            sheet_no=f"GY{today.strftime('%Y%m')}{seq:04d}",
+            confirm_version_no=0,
+            status="草稿",
+            created_by=contract.updated_by or contract.created_by,
+            updated_by=contract.updated_by or contract.created_by,
+        )
+        db.add(sheet)
+        db.flush()
+
+    # Create process sheet item
+    sheet_item = ProcessSheetItem(
+        process_sheet_id=sheet.id,
+        contract_item_id=item.id,
+        line_no=item.line_no,
+        spec_id=item.spec_id,
+        is_pressed=item.is_pressed,
+        packaging_type=item.packaging_type or "",
+        delivery_date=item.delivery_date,
+        pattern_count=item.pattern_count or 0,
+        pattern_data=item.pattern_data,
+        pattern_code=item.pattern_code or "",
+        color_a=item.color_a or "",
+        image_a_1=item.image_a_1 or "",
+        image_a_2=item.image_a_2 or "",
+        image_a_3=item.image_a_3 or "",
+        color_b=item.color_b or "",
+        image_b_1=item.image_b_1 or "",
+        image_b_2=item.image_b_2 or "",
+        image_b_3=item.image_b_3 or "",
+        remark=item.remark or "",
+    )
+    db.add(sheet_item)
+
+    # Update contract status to 已下发 (if it was confirmed)
+    if contract.status == "确认":
+        contract.status = "已下发"
+
+    user = db.query(User).filter(User.id == user_id).first()
+    log = ProductionLog(
+        contract_id=contract.id,
+        contract_item_id=item.id,
+        from_status=item.production_status,
+        to_status="push_down",
+        operation_type="推进",
+        operator_id=user_id,
+        remark=f"下推工艺单: {sheet.sheet_no}",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(sheet)
+    return sheet
+
+
+def item_has_process_sheet(db: Session, item_id: int) -> bool:
+    """Check if a contract item has already been pushed down to a process sheet."""
+    existing = db.query(ProcessSheetItem).filter(
+        ProcessSheetItem.contract_item_id == item_id
+    ).first()
+    return existing is not None
