@@ -8,10 +8,8 @@
           <span>
             <el-tag :type="statusType(contract?.status)" size="small">{{ contract?.status }}</el-tag>
             <el-button size="small" style="margin-left:8px" @click="$router.push(`/contracts/${contract?.id}/edit`)" :disabled="contract?.status==='已下发'">编辑</el-button>
-            <el-button size="small" type="warning" @click="handleGenerateImage" :disabled="contract?.status!=='草稿'">生成确认图</el-button>
-            <el-button size="small" @click="handleGenerateLink" :disabled="contract?.status!=='草稿'">{{ contract?.confirm_token ? '复制确认链接' : '生成确认链接' }}</el-button>
-            <el-button size="small" type="success" @click="handleConfirm" :disabled="contract?.status!=='草稿'">标记客户确认</el-button>
-            <el-button size="small" type="primary" @click="handlePushDown" :disabled="contract?.status!=='保存' || contract?.is_pushed_down">下推工艺单</el-button>
+            <el-button size="small" type="danger" @click="manualConfirmDialogVisible = true" :disabled="contract?.status!=='草稿'" v-if="userRole === '销售经理'">手动确认</el-button>
+            <el-button size="small" type="primary" @click="handlePushDown" :disabled="contract?.status!=='确认' || contract?.is_pushed_down">下推工艺单</el-button>
           </span>
         </div>
       </template>
@@ -20,32 +18,10 @@
         <el-descriptions-item label="客户">{{ contract?.customer?.name }}</el-descriptions-item>
         <el-descriptions-item label="合同日期">{{ contract?.contract_date }}</el-descriptions-item>
         <el-descriptions-item label="交货日期">{{ contract?.delivery_date }}</el-descriptions-item>
-        <el-descriptions-item label="最新确认版本">V{{ contract?.latest_confirm_version }}</el-descriptions-item>
-        <el-descriptions-item label="总金额">¥{{ contract?.total_amount?.toFixed(2) }}</el-descriptions-item>
-        <el-descriptions-item label="行项目进度">{{ progressSummary }}</el-descriptions-item>
-      </el-descriptions>
-      <el-descriptions v-if="contract?.customer_comment" :column="1" border style="margin-top:8px">
-        <el-descriptions-item label="客户确认意见">{{ contract.customer_comment }}</el-descriptions-item>
       </el-descriptions>
 
       <el-divider>行项目</el-divider>
       <el-table :data="contract?.items || []" stripe size="small">
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div style="padding:8px 16px">
-              <div v-if="row.pattern_data?.length">
-                <div style="font-weight:bold;margin-bottom:4px">花型</div>
-                <div v-for="(p, pi) in row.pattern_data" :key="pi" style="display:flex;gap:8px;align-items:center;margin:4px 0;padding:4px 8px;background:#f5f7fa;border-radius:4px">
-                  <el-tag size="small">{{ p.code }}</el-tag>
-                  <span style="font-size:12px;color:#666">颜色: {{ p.color || '无色' }}</span>
-                  <span style="font-size:12px;color:#666">数量: ×{{ p.qty }}</span>
-                  <span style="font-size:12px;color:#666">包边色号: {{ p.binding_color_no || contract?.binding_color_no || '—' }}</span>
-                  <el-image v-if="p.image" :src="p.image" style="width:100px;height:100px;border-radius:4px;object-fit:cover;border:1px solid #dcdfe6;cursor:pointer" :preview-src-list="[p.image]" preview-teleported />
-                </div>
-              </div>
-            </div>
-          </template>
-        </el-table-column>
         <el-table-column prop="line_no" label="行号" width="60" />
         <el-table-column label="毛毯规格" min-width="160">
           <template #default="{ row }">
@@ -55,29 +31,18 @@
         <el-table-column label="包装方式" width="100">
           <template #default="{ row }">{{ row.packaging_type || '—' }}</template>
         </el-table-column>
-        <el-table-column label="包边材料" width="100">
-          <template #default="{ row }">{{ contract?.binding_material || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="包边宽度" width="80">
-          <template #default="{ row }">{{ contract?.binding_width || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="压花" width="60">
+        <el-table-column label="压花" width="55">
           <template #default="{ row }">{{ row.is_pressed ? '是' : '否' }}</template>
-        </el-table-column>
-        <el-table-column label="压花模型" min-width="100">
-          <template #default="{ row }">{{ contract?.emboss_model || '—' }}</template>
         </el-table-column>
         <el-table-column label="交货日期" width="110">
           <template #default="{ row }">{{ row.delivery_date || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="unit_price" label="单价" width="80" />
-        <el-table-column prop="qty" label="数量" width="60" />
-        <el-table-column prop="amount" label="金额" width="80" />
+        <el-table-column prop="qty" label="数量(条)" width="75" />
         <el-table-column prop="remark" label="备注" min-width="120" />
         <el-table-column label="生产进度" min-width="160" fixed="right">
           <template #default="{ row }">
             <template v-if="row.production_status">
-              <div v-if="row.production_status === '已取消'" style="display:flex;align-items:center">
+              <div v-if="row.production_status === 'cancelled'" style="display:flex;align-items:center">
                 <el-progress :percentage="100" :stroke-width="16" status="exception" style="flex:1" />
                 <span style="margin-left:6px;color:#f56c6c;white-space:nowrap">已取消</span>
               </div>
@@ -117,8 +82,8 @@
       <el-divider>状态日志</el-divider>
       <el-table :data="contractLogs" stripe size="small" v-if="contractLogs.length">
         <el-table-column prop="created_at" label="时间" width="160" />
-        <el-table-column prop="action" label="操作" width="100" />
-        <el-table-column prop="item_line" label="行号" width="60" />
+        <el-table-column prop="operation_type" label="操作" width="100" />
+        <el-table-column prop="contract_item_id" label="行号" width="60" />
         <el-table-column prop="from_status" label="从" width="100" />
         <el-table-column prop="to_status" label="到" width="100" />
         <el-table-column prop="operator_name" label="操作人" width="100" />
@@ -145,9 +110,26 @@
       </template>
     </el-dialog>
 
-    <!-- 取消 dialog -->
-    <el-dialog v-model="cancelDialogVisible" title="取消行项目" width="400px">
+    <!-- 手动确认 dialog -->
+    <el-dialog v-model="manualConfirmDialogVisible" title="手动确认合同" width="420px">
       <el-form>
+        <el-form-item label="合同号">{{ contract?.contract_no }}</el-form-item>
+        <el-form-item label="确认意见" required>
+          <el-input v-model="manualConfirmRemark" type="textarea" :rows="3" placeholder="请填写确认意见（必填）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="manualConfirmDialogVisible = false; manualConfirmRemark = ''">取消</el-button>
+        <el-button type="danger" :loading="dialogLoading" @click="handleManualConfirm">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 取消 dialog -->
+    <el-dialog v-model="cancelDialogVisible" title="取消行项目" width="420px">
+      <el-form>
+        <el-form-item label="取消原因">
+          <el-input v-model="cancelReason" type="textarea" :rows="2" placeholder="请输入取消原因" />
+        </el-form-item>
         <el-form-item label="取消数量">
           <el-input-number v-model="cancelQty" :min="1" :max="currentItem?.qty || 1" />
         </el-form-item>
@@ -177,7 +159,7 @@
     <el-dialog v-model="logDialogVisible" title="状态日志" width="700px">
       <el-table :data="dialogLogs" stripe size="small" v-loading="dialogLoading">
         <el-table-column prop="created_at" label="时间" width="160" />
-        <el-table-column prop="action" label="操作" width="100" />
+        <el-table-column prop="operation_type" label="操作" width="100" />
         <el-table-column prop="from_status" label="从" width="100" />
         <el-table-column prop="to_status" label="到" width="100" />
         <el-table-column prop="operator_name" label="操作人" width="100" />
@@ -194,8 +176,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
-import { getContract, generateConfirmImage, markConfirmed, getVersions, generateConfirmLink } from '../../api/contract'
+import { getContract, getVersions, manualConfirm } from '../../api/contract'
 import { pushDownFromContract } from '../../api/processSheet'
 import { listProcessSteps, advanceItem, rollbackItem, cancelItem, releaseYarnPlan, getItemLogs, getContractLogs } from '../../api/production'
 import { listUsers } from '../../api/user'
@@ -217,9 +198,13 @@ const yarnDialogVisible = ref(false)
 const logDialogVisible = ref(false)
 const currentItem = ref(null)
 const cancelQty = ref(0)
+const cancelReason = ref('')
 const selectedUserId = ref(null)
 const dialogLogs = ref([])
 const dialogLoading = ref(false)
+
+const manualConfirmDialogVisible = ref(false)
+const manualConfirmRemark = ref('')
 
 const userRole = computed(() => {
   try {
@@ -234,7 +219,7 @@ const currentUserId = computed(() => {
   try {
     const token = localStorage.getItem('token')
     const payload = JSON.parse(atob(token.split('.')[1]))
-    return payload.user_id
+    return payload.sub
   } catch { return null }
 })
 
@@ -242,30 +227,30 @@ const progressSummary = computed(() => {
   const items = contract.value?.items || []
   const total = items.length
   const released = items.filter(i => i.production_status).length
-  const completed = items.filter(i => i.production_status === '已完成').length
-  const cancelled = items.filter(i => i.production_status === '已取消').length
+  const completed = items.filter(i => i.production_status === 'completed').length
+  const cancelled = items.filter(i => i.production_status === 'cancelled').length
   return `已下${released}/${total}行 | 完成${completed}行 | 取消${cancelled}行`
 })
 
 const stepNameMap = computed(() => {
   const map = {}
   for (const step of processSteps.value) {
-    map[step.code] = step.name
+    map[step.step_code] = step.step_name
   }
   return map
 })
 
 function statusType(s) {
   if (s === '草稿') return 'warning'
-  if (s === '保存') return 'success'
+  if (s === '确认') return 'success'
   return 'info'
 }
 
 function progressPercent(row) {
-  if (!row.production_status || row.production_status === '已取消') return 100
+  if (!row.production_status || row.production_status === 'cancelled') return 100
   const steps = processSteps.value
   if (!steps.length) return 0
-  const idx = steps.findIndex(s => s.code === row.production_status)
+  const idx = steps.findIndex(s => s.step_code === row.production_status)
   if (idx === -1) return 0
   return Math.round(((idx + 1) / steps.length) * 100)
 }
@@ -281,20 +266,22 @@ function canReleaseYarn(row) {
 
 function canAdvance(row) {
   if (!row.production_status) return false
-  if (row.production_status === '已取消' || row.production_status === '已完成') return false
+  if (row.production_status === 'cancelled' || row.production_status === 'completed') return false
   const role = userRole.value
   if (role === '销售经理' || role === '生产专员') return true
+  // 外协人员只能推进织造工序
+  if (role === '外协人员' && row.production_status === 'weaving') return true
   return false
 }
 
 function canRollback(row) {
   const role = userRole.value
-  return (role === '销售经理' || role === '生产专员') && row.production_status && row.production_status !== '已取消'
+  return (role === '销售经理' || role === '生产专员') && row.production_status && row.production_status !== 'cancelled'
 }
 
 function canCancel(row) {
   const role = userRole.value
-  return (role === '销售经理' || role === '生产专员') && row.production_status !== '已取消'
+  return (role === '销售经理' || role === '生产专员' || role === '业务员') && row.production_status !== 'cancelled'
 }
 
 // --- Dialogs ---
@@ -333,6 +320,7 @@ async function confirmRollback() {
 
 function openCancelDialog(row) {
   currentItem.value = row
+  cancelReason.value = ''
   cancelQty.value = row.qty || 0
   cancelDialogVisible.value = true
 }
@@ -340,7 +328,7 @@ function openCancelDialog(row) {
 async function confirmCancel() {
   dialogLoading.value = true
   try {
-    await cancelItem(currentItem.value.id, { qty: cancelQty.value })
+    await cancelItem(currentItem.value.id, { reason: cancelReason.value || '无', quantities: { total: cancelQty.value } })
     ElMessage.success('已取消')
     cancelDialogVisible.value = false
     loadData()
@@ -361,7 +349,7 @@ async function confirmYarn() {
   }
   dialogLoading.value = true
   try {
-    await releaseYarnPlan(currentItem.value.id, { user_id: selectedUserId.value })
+    await releaseYarnPlan(currentItem.value.id, { yarn_plan_user_id: selectedUserId.value })
     ElMessage.success('坯布计划已下达')
     yarnDialogVisible.value = false
     loadData()
@@ -381,34 +369,20 @@ async function openLogDialog(row) {
   finally { dialogLoading.value = false }
 }
 
-async function handleGenerateLink() {
+async function handleManualConfirm() {
+  if (!manualConfirmRemark.value?.trim()) {
+    ElMessage.warning('请填写确认意见')
+    return
+  }
+  dialogLoading.value = true
   try {
-    if (contract.value?.confirm_token) {
-      await navigator.clipboard.writeText(`${window.location.origin}/confirm/${contract.value.confirm_token}`)
-      ElMessage.success('确认链接已复制到剪贴板')
-      return
-    }
-    const res = await generateConfirmLink(route.params.id)
-    contract.value.confirm_token = res.data.token
-    await navigator.clipboard.writeText(`${window.location.origin}${res.data.url}`)
-    ElMessage.success('确认链接已生成并复制到剪贴板')
-  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
-}
-
-async function handleGenerateImage() {
-  try {
-    await generateConfirmImage(route.params.id)
-    ElMessage.success('确认图已生成')
-    loadData()
-  } catch (e) { ElMessage.error(e.response?.data?.detail || '生成失败') }
-}
-
-async function handleConfirm() {
-  try {
-    await markConfirmed(route.params.id)
-    ElMessage.success('已标记客户确认')
+    await manualConfirm(route.params.id, { remark: manualConfirmRemark.value.trim() })
+    ElMessage.success('合同已手动确认')
+    manualConfirmDialogVisible.value = false
+    manualConfirmRemark.value = ''
     loadData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+  finally { dialogLoading.value = false }
 }
 
 async function handlePushDown() {

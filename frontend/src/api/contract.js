@@ -9,3 +9,6 @@ export function generateConfirmImage(id) { return api.post(`/contracts/${id}/con
 export function markConfirmed(id) { return api.post(`/contracts/${id}/confirm`) }
 export function getVersions(id) { return api.get(`/contracts/${id}/versions`) }
 export function getAvailableContracts() { return api.get('/contracts/available') }
+export function generateConfirmLink(id) { return api.post(`/contracts/${id}/generate-confirm-link`) }
+export function getNextContractNo(customerId) { return api.get('/contracts/next-no', { params: { customer_id: customerId } }) }
+export function manualConfirm(id, data) { return api.post(`/contracts/${id}/manual-confirm`, data) }
