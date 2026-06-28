@@ -19,24 +19,23 @@
         <template #default="{ row }">{{ row.customer?.name }}</template>
       </el-table-column>
       <el-table-column prop="contract_date" label="日期" width="110" />
-      <el-table-column label="规格" min-width="160">
-        <template #default="{ row }">{{ row.spec_description || row.spec?.spec_description }}</template>
-      </el-table-column>
-      <el-table-column prop="total_amount" label="总金额" width="120" align="right">
-        <template #default="{ row }">{{ row.total_amount?.toFixed(2) }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="90">
+      <el-table-column label="规格" min-width="200">
         <template #default="{ row }">
-          <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
+          {{ row.items?.map(i => i.spec_description).filter(Boolean).join('；') }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column label="状态" width="130">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row.computed_status || row.status)" size="small">{{ row.computed_status || row.status }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="250" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="viewDetail(row)">详情</el-button>
-          <el-button size="small" type="primary" @click="openEdit(row)" :disabled="row.status==='已下发'">编辑</el-button>
+          <el-button size="small" type="primary" @click="openEdit(row)" :disabled="row.status!=='草稿'">编辑</el-button>
           <el-popconfirm title="确认删除?" @confirm="handleDelete(row)">
             <template #reference>
-              <el-button size="small" type="danger" :disabled="row.status==='已下发'">删除</el-button>
+              <el-button size="small" type="danger" :disabled="row.status!=='草稿'">删除</el-button>
             </template>
           </el-popconfirm>
         </template>
@@ -59,6 +58,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listContracts, deleteContract } from '../../api/contract'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const contracts = ref([])
@@ -70,7 +70,10 @@ const total = ref(0)
 
 function statusType(s) {
   if (s === '草稿') return 'warning'
-  if (s === '保存') return 'success'
+  if (s === '确认') return 'success'
+  if (s === '已下发') return 'primary'
+  if (s === '已取消') return 'danger'
+  if (s === '已完成') return 'success'
   return 'info'
 }
 

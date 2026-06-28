@@ -7,9 +7,9 @@
           <span>合同号: {{ contract?.contract_no }}</span>
           <span>
             <el-tag :type="statusType(contract?.status)" size="small">{{ contract?.status }}</el-tag>
-            <el-button size="small" style="margin-left:8px" @click="$router.push(`/contracts/${contract?.id}/edit`)" :disabled="contract?.status==='已下发'">编辑</el-button>
+            <el-button size="small" style="margin-left:8px" @click="$router.push(`/contracts/${contract?.id}/edit`)" :disabled="contract?.status!=='草稿'">编辑</el-button>
             <el-button size="small" type="danger" @click="manualConfirmDialogVisible = true" :disabled="contract?.status!=='草稿'" v-if="userRole === '销售经理'">手动确认</el-button>
-            <el-button size="small" type="primary" @click="handlePushDown" :disabled="contract?.status!=='确认' || contract?.is_pushed_down">下推工艺单</el-button>
+            <el-button size="small" type="primary" @click="handlePushDown" :disabled="(contract?.status!=='确认' && contract?.status!=='已下发') || contract?.is_pushed_down">下推工艺单</el-button>
           </span>
         </div>
       </template>
@@ -244,6 +244,7 @@ const stepNameMap = computed(() => {
 function statusType(s) {
   if (s === '草稿') return 'warning'
   if (s === '确认') return 'success'
+  if (s === '已下发') return 'primary'
   return 'info'
 }
 
@@ -262,6 +263,7 @@ function statusLabel(code) {
 
 function canReleaseYarn(row) {
   const role = userRole.value
+  if (contract.value?.status === '草稿') return false
   return (role === '销售经理' || role === '生产专员') && !row.production_status
 }
 
@@ -288,7 +290,7 @@ function canCancel(row) {
 function canPushDown(row) {
   const role = userRole.value
   if (role !== '销售经理' && role !== '生产专员') return false
-  if (contract.value?.status !== '确认') return false
+  if (contract.value?.status !== '确认' && contract.value?.status !== '已下发') return false
   return !row.has_process_sheet
 }
 
