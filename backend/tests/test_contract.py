@@ -93,9 +93,9 @@ def test_contract_status_flow(db_session):
 
     assert contract.status == "草稿"
 
-    contract.status = "保存"
+    contract.status = "确认"
     db_session.commit()
-    assert contract.status == "保存"
+    assert contract.status == "确认"
 
     contract.status = "已下发"
     db_session.commit()
