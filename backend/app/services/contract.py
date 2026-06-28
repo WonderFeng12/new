@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from app.models.contract import Contract
 from app.models.contract_item import ContractItem
+from sqlalchemy.orm import defaultload
 from app.schemas.contract import ContractCreate, ContractUpdate
 from app.schemas.contract_item import ContractItemCreate
 from fastapi import HTTPException
@@ -33,7 +34,7 @@ def list_contracts(
     return q.order_by(Contract.id.desc()).options(
         joinedload(Contract.customer),
         joinedload(Contract.spec),
-        joinedload(Contract.items),
+        joinedload(Contract.items).joinedload(ContractItem.spec),
     ).all()
 
 
@@ -43,7 +44,7 @@ def get_contract(db: Session, id: int):
     ).options(
         joinedload(Contract.customer),
         joinedload(Contract.spec),
-        joinedload(Contract.items),
+        joinedload(Contract.items).joinedload(ContractItem.spec),
     ).first()
 
 
@@ -64,6 +65,12 @@ def create_contract(db: Session, data: ContractCreate, username: str):
         item = ContractItem(
             contract_id=contract.id,
             line_no=item_data.line_no,
+            spec_id=item_data.spec_id,
+            is_pressed=item_data.is_pressed,
+            packaging_type=item_data.packaging_type or "",
+            delivery_date=item_data.delivery_date,
+            pattern_count=item_data.pattern_count or 0,
+            pattern_data=item_data.pattern_data,
             unit_price=item_data.unit_price,
             qty=item_data.qty,
             amount=(item_data.unit_price or 0) * (item_data.qty or 0),
@@ -113,6 +120,12 @@ def update_contract(db: Session, id: int, data: ContractUpdate, username: str):
             item = ContractItem(
                 contract_id=id,
                 line_no=item_data.line_no,
+                spec_id=item_data.spec_id,
+                is_pressed=item_data.is_pressed,
+                packaging_type=item_data.packaging_type or "",
+                delivery_date=item_data.delivery_date,
+                pattern_count=item_data.pattern_count or 0,
+                pattern_data=item_data.pattern_data,
                 unit_price=item_data.unit_price,
                 qty=item_data.qty,
                 amount=(item_data.unit_price or 0) * (item_data.qty or 0),
@@ -157,3 +170,24 @@ def get_available_contracts(db: Session):
         joinedload(Contract.customer),
         joinedload(Contract.spec),
     ).all()
+
+
+def compute_contract_status(db: Session, contract_id: int) -> str:
+    """Derive the display-friendly contract status from its items' production_status."""
+    items = db.query(ContractItem).filter(
+        ContractItem.contract_id == contract_id
+    ).all()
+    if not items:
+        return "草稿"
+    statuses = [i.production_status for i in items]
+    all_cancelled = all(s == "cancelled" for s in statuses if s) and any(s for s in statuses)
+    all_completed = all(s == "completed" for s in statuses if s) and any(s for s in statuses)
+    any_production = any(s and s not in ("cancelled", "completed") for s in statuses)
+
+    if all_cancelled:
+        return "已取消"
+    if all_completed:
+        return "已完成"
+    if any_production:
+        return "坯布计划已下达"
+    return "确认"
