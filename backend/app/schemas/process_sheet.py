@@ -1,10 +1,68 @@
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Any
+from datetime import datetime, date
+
+
+class ProcessSheetItemCreate(BaseModel):
+    contract_item_id: int
+    line_no: int
+
+
+class ProcessSheetItemOut(BaseModel):
+    id: int
+    process_sheet_id: int
+    contract_item_id: int
+    line_no: int
+    spec_id: int
+    is_pressed: bool = False
+    packaging_type: Optional[str] = None
+    delivery_date: Optional[date] = None
+    pattern_count: int = 0
+    pattern_data: Optional[Any] = None
+    pattern_code: Optional[str] = None
+    color_a: Optional[str] = None
+    image_a_1: Optional[str] = None
+    image_a_2: Optional[str] = None
+    image_a_3: Optional[str] = None
+    color_b: Optional[str] = None
+    image_b_1: Optional[str] = None
+    image_b_2: Optional[str] = None
+    image_b_3: Optional[str] = None
+    pressed_image: Optional[str] = None
+    remark: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProcessSheetUpdateItem(BaseModel):
+    id: int
+    is_pressed: Optional[bool] = None
+    packaging_type: Optional[str] = None
+    delivery_date: Optional[date] = None
+    pattern_count: Optional[int] = None
+    pattern_data: Optional[Any] = None
+    pattern_code: Optional[str] = None
+    color_a: Optional[str] = None
+    image_a_1: Optional[str] = None
+    image_a_2: Optional[str] = None
+    image_a_3: Optional[str] = None
+    color_b: Optional[str] = None
+    image_b_1: Optional[str] = None
+    image_b_2: Optional[str] = None
+    image_b_3: Optional[str] = None
+    pressed_image: Optional[str] = None
+    remark: Optional[str] = None
 
 
 class ProcessSheetCreate(BaseModel):
     contract_id: int
+    contract_item_ids: list[int]
+
+
+class ProcessSheetUpdateDetail(BaseModel):
+    detail_data: Optional[dict] = None
+    items: Optional[list[ProcessSheetUpdateItem]] = None
 
 
 class ProcessSheetOut(BaseModel):
@@ -14,10 +72,14 @@ class ProcessSheetOut(BaseModel):
     confirm_version_no: int
     confirm_image_id: Optional[int] = None
     status: str = "草稿"
+    confirm_token: Optional[str] = None
+    customer_comment: Optional[str] = None
+    detail_data: Optional[Any] = None
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    items: list[ProcessSheetItemOut] = []
 
     class Config:
         from_attributes = True

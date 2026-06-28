@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.process_sheet import ProcessSheetCreate, ProcessSheetOut
+from app.schemas.process_sheet import (
+    ProcessSheetCreate, ProcessSheetOut, ProcessSheetUpdateDetail
+)
 from app.services import process_sheet as service
 from app.utils.pdf_generator import render_process_sheet, HAS_WEASYPRINT
 from app.dependencies import get_current_user
@@ -38,8 +40,27 @@ def create(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.create_sheet_from_contract(
-        db, data.contract_id, current_user.display_name or current_user.username
+    if current_user.role == "业务员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return service.create_sheet_from_items(
+        db, data.contract_id, data.contract_item_ids,
+        current_user.display_name or current_user.username
+    )
+
+
+@router.put("/{id}/detail", response_model=ProcessSheetOut)
+def update_detail(
+    id: int,
+    data: ProcessSheetUpdateDetail,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "业务员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    items_data = [i.model_dump(exclude_unset=True) for i in data.items] if data.items else None
+    return service.update_sheet_detail(
+        db, id, data.detail_data, items_data,
+        current_user.display_name or current_user.username
     )
 
 
@@ -98,3 +119,14 @@ def delete(
     if not service.delete_sheet(db, id):
         raise HTTPException(status_code=404, detail="工艺单不存在")
     return {"message": "已删除"}
+
+
+@router.post("/{id}/generate-confirm-link")
+def generate_sheet_confirm_link(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "生产专员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return service.generate_confirm_link(db, id)
