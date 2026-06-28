@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException
@@ -10,6 +11,14 @@ from app.models.process_sheet_item import ProcessSheetItem
 from app.models.process_step import ProcessStep
 from app.models.user import User
 from app.services.process_step import get_ordered_step_codes
+from app.services.notify import (
+    notify_yarn_plan_released,
+    notify_production_advance,
+    notify_item_cancelled,
+    notify_completed,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _get_next_step(current: str, ordered_steps: list[str]) -> str | None:
@@ -100,6 +109,46 @@ def advance_item(db: Session, item_id: int, user_id: int, remark: str = ""):
     db.add(log)
     db.commit()
     db.refresh(item)
+
+    # Non-blocking WeCom notifications
+    try:
+        from app.models.process_step import ProcessStep
+        from app.models.process_step_assignee import ProcessStepAssignee
+
+        old_step_obj = db.query(ProcessStep).filter(
+            ProcessStep.step_code == old_status
+        ).first()
+        new_step_obj = db.query(ProcessStep).filter(
+            ProcessStep.step_code == next_step
+        ).first()
+        from_step_name = old_step_obj.step_name if old_step_obj else old_status
+        to_step_name = new_step_obj.step_name if new_step_obj else next_step
+
+        next_assignees = []
+        if new_step_obj:
+            assignees = db.query(ProcessStepAssignee).filter(
+                ProcessStepAssignee.process_step_id == new_step_obj.id
+            ).all()
+            next_assignees = [a.user.wecom_userid for a in assignees
+                             if a.user and a.user.wecom_userid]
+
+        notify_production_advance(
+            db, item.contract.contract_no,
+            item.spec_description or "",
+            from_step_name, to_step_name,
+            user.display_name,
+            next_assignees if next_assignees else None,
+        )
+
+        # Check if this is the terminal step
+        if _get_next_step(next_step, ordered) is None:
+            notify_completed(
+                db, item.contract.contract_no,
+                item.spec_description or "",
+            )
+    except Exception as e:
+        logger.warning(f"通知发送失败（不影响业务）: {e}")
+
     return item, log
 
 
@@ -220,6 +269,18 @@ def cancel_item(
     db.add(log)
     db.commit()
     db.refresh(item)
+
+    # Non-blocking WeCom notification
+    try:
+        notify_item_cancelled(
+            db, item.contract.contract_no,
+            item.spec_description or "",
+            reason,
+            user.display_name,
+        )
+    except Exception as e:
+        logger.warning(f"通知发送失败（不影响业务）: {e}")
+
     return item, log
 
 
@@ -264,6 +325,17 @@ def release_yarn_plan(
     db.add(log)
     db.commit()
     db.refresh(item)
+
+    # Non-blocking WeCom notification
+    try:
+        notify_yarn_plan_released(
+            db, item.contract.contract_no,
+            item.spec_description or "",
+            yarn_user.wecom_userid if yarn_user else None,
+        )
+    except Exception as e:
+        logger.warning(f"通知发送失败（不影响业务）: {e}")
+
     return item, log
 
 
