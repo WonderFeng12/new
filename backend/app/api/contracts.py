@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from app.database import get_db
 from app.schemas.contract import ContractCreate, ContractUpdate, ContractOut
-from app.schemas.confirm_image import ConfirmImageOut, ConfirmImageFullOut
 from app.services import contract as service
-from app.services import confirm_image as confirm_service
 from app.dependencies import get_current_user
 from app.models.user import User
+
+
+class ManualConfirmRequest(BaseModel):
+    remark: str
 
 router = APIRouter(prefix="/api/contracts", tags=["contracts"])
 
@@ -20,6 +23,17 @@ def list_all(
     if current_user.role == "生产专员":
         raise HTTPException(status_code=403, detail="权限不足")
     return service.list_contracts(db, keyword, current_user.id, current_user.role)
+
+
+@router.get("/next-no")
+def next_contract_no(
+    customer_id: int = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "生产专员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return {"contract_no": service.generate_contract_no(db, customer_id)}
 
 
 @router.get("/available", response_model=list[ContractOut])
@@ -85,34 +99,18 @@ def delete(
     return {"message": "已删除"}
 
 
-@router.post("/{id}/confirm-image", response_model=ConfirmImageOut)
-def generate_confirm(
+@router.post("/{id}/manual-confirm", response_model=ContractOut)
+def manual_confirm(
     id: int,
+    data: ManualConfirmRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role == "生产专员":
         raise HTTPException(status_code=403, detail="权限不足")
-    return confirm_service.generate_confirm_image(db, id, current_user.display_name or current_user.username)
-
-
-@router.post("/{id}/confirm", response_model=ConfirmImageOut)
-def mark_confirm(
-    id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
-    return confirm_service.mark_confirmed(db, id, current_user.display_name or current_user.username)
-
-
-@router.get("/{id}/versions", response_model=list[ConfirmImageOut])
-def version_history(
-    id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
-    return confirm_service.get_versions(db, id)
+    if not data.remark or not data.remark.strip():
+        raise HTTPException(status_code=400, detail="确认意见不能为空")
+    result = service.manual_confirm_contract(db, id, current_user.id, data.remark.strip())
+    if not result:
+        raise HTTPException(status_code=404, detail="合同不存在")
+    return result

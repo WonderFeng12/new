@@ -2,14 +2,15 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
 
-from app.schemas.contract_item import ContractItemCreate, ContractItemUpdate, ContractItemOut
+from app.schemas.contract_item import ContractItemCreate, ContractItemUpdate, ContractItemUpdateWithId, ContractItemOut
+from app.schemas.customer import CustomerOut
 
 
 class ContractCreate(BaseModel):
     contract_no: str
     customer_id: int
     contract_date: date
-    spec_id: int
+    spec_id: Optional[int] = None
     spec_description: Optional[str] = ""
     is_pressed: Optional[bool] = False
     packaging_type: Optional[str] = ""
@@ -32,15 +33,21 @@ class ContractCreate(BaseModel):
     accessory_desc_1: Optional[str] = ""
     accessory_size_1: Optional[str] = ""
     accessory_qty_1: Optional[float] = None
+    accessory_images_1: Optional[list[str]] = None
     accessory_desc_2: Optional[str] = ""
     accessory_size_2: Optional[str] = ""
-    accessory_qty_2: Optional[float] = None
+    accessory_qty_2: Optional[str] = None
+    accessory_images_2: Optional[list[str]] = None
     accessory_desc_3: Optional[str] = ""
     accessory_size_3: Optional[str] = ""
-    accessory_qty_3: Optional[float] = None
+    accessory_qty_3: Optional[str] = None
+    accessory_images_3: Optional[list[str]] = None
     accessory_desc_4: Optional[str] = ""
     accessory_size_4: Optional[str] = ""
-    accessory_qty_4: Optional[float] = None
+    accessory_qty_4: Optional[str] = None
+    accessory_images_4: Optional[list[str]] = None
+    washing_labels: Optional[list[dict]] = None
+    origin_labels: Optional[list[dict]] = None
     accessory_desc_5: Optional[str] = ""
     accessory_size_5: Optional[str] = ""
     accessory_qty_5: Optional[float] = None
@@ -89,15 +96,21 @@ class ContractUpdate(BaseModel):
     accessory_desc_1: Optional[str] = None
     accessory_size_1: Optional[str] = None
     accessory_qty_1: Optional[float] = None
+    accessory_images_1: Optional[list[str]] = None
     accessory_desc_2: Optional[str] = None
     accessory_size_2: Optional[str] = None
-    accessory_qty_2: Optional[float] = None
+    accessory_qty_2: Optional[str] = None
+    accessory_images_2: Optional[list[str]] = None
     accessory_desc_3: Optional[str] = None
     accessory_size_3: Optional[str] = None
-    accessory_qty_3: Optional[float] = None
+    accessory_qty_3: Optional[str] = None
+    accessory_images_3: Optional[list[str]] = None
     accessory_desc_4: Optional[str] = None
     accessory_size_4: Optional[str] = None
-    accessory_qty_4: Optional[float] = None
+    accessory_qty_4: Optional[str] = None
+    accessory_images_4: Optional[list[str]] = None
+    washing_labels: Optional[list[dict]] = None
+    origin_labels: Optional[list[dict]] = None
     accessory_desc_5: Optional[str] = None
     accessory_size_5: Optional[str] = None
     accessory_qty_5: Optional[float] = None
@@ -116,15 +129,16 @@ class ContractUpdate(BaseModel):
     box_note_3: Optional[str] = None
 
     emboss_model: Optional[str] = None
-    items: Optional[list[ContractItemCreate]] = None
+    items: Optional[list[ContractItemUpdateWithId]] = None
 
 
 class ContractOut(BaseModel):
     id: int
     contract_no: str
     customer_id: int
+    customer: Optional[CustomerOut] = None
     contract_date: date
-    spec_id: int
+    spec_id: Optional[int] = None
     spec_description: Optional[str] = ""
     is_pressed: Optional[bool] = False
     packaging_type: Optional[str] = ""
@@ -137,8 +151,6 @@ class ContractOut(BaseModel):
     status: str = "草稿"
     is_pushed_down: bool = False
     push_down_sheet_id: Optional[int] = None
-    latest_confirm_version: int = 0
-
     tech_note_1: Optional[str] = ""
     tech_note_2: Optional[str] = ""
     tech_note_3: Optional[str] = ""
@@ -155,13 +167,19 @@ class ContractOut(BaseModel):
     accessory_qty_1: Optional[float] = None
     accessory_desc_2: Optional[str] = ""
     accessory_size_2: Optional[str] = ""
-    accessory_qty_2: Optional[float] = None
+    accessory_qty_2: Optional[str] = None
     accessory_desc_3: Optional[str] = ""
     accessory_size_3: Optional[str] = ""
-    accessory_qty_3: Optional[float] = None
+    accessory_qty_3: Optional[str] = None
     accessory_desc_4: Optional[str] = ""
     accessory_size_4: Optional[str] = ""
-    accessory_qty_4: Optional[float] = None
+    accessory_qty_4: Optional[str] = None
+    accessory_images_1: Optional[list[str]] = None
+    accessory_images_2: Optional[list[str]] = None
+    accessory_images_3: Optional[list[str]] = None
+    accessory_images_4: Optional[list[str]] = None
+    washing_labels: Optional[list[dict]] = None
+    origin_labels: Optional[list[dict]] = None
     accessory_desc_5: Optional[str] = ""
     accessory_size_5: Optional[str] = ""
     accessory_qty_5: Optional[float] = None
@@ -184,6 +202,7 @@ class ContractOut(BaseModel):
     updated_by: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    computed_status: Optional[str] = None
 
     class Config:
         from_attributes = True
