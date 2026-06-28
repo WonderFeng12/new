@@ -14,6 +14,10 @@
           <el-icon><DataBoard /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
+        <el-menu-item v-if="store.role === '外协人员'" index="/my-tasks">
+          <el-icon><List /></el-icon>
+          <span>我的任务</span>
+        </el-menu-item>
         <el-menu-item v-if="showContracts" index="/contracts">
           <el-icon><Document /></el-icon>
           <span>合同管理</span>

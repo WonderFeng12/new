@@ -62,6 +62,11 @@ const routes = [
     component: () => import('../views/processStep/ProcessStepList.vue'),
     meta: { roles: ['销售经理', '生产专员'] },
   },
+  {
+    path: '/my-tasks',
+    component: () => import('../views/task/MyTasks.vue'),
+    meta: { roles: ['外协人员'] },
+  },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
