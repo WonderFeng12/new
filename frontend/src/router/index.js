@@ -67,6 +67,11 @@ const routes = [
     component: () => import('../views/task/MyTasks.vue'),
     meta: { roles: ['外协人员'] },
   },
+  {
+    path: '/settings/wecom',
+    component: () => import('../views/settings/WeComSettings.vue'),
+    meta: { roles: ['销售经理', '生产专员'] },
+  },
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
