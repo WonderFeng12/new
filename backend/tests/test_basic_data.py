@@ -60,7 +60,16 @@ def check_status(resp, expected=200):
     return True
 
 # Track created IDs for cleanup
-created_ids = []
+created_ids = []          # items in color_mapping category
+created_color_ids = []    # items in color category (for mapping endpoint)
+
+# Measure initial count of items in color_mapping category
+_INITIAL_CM_COUNT = len(requests.get(
+    f"{BASE_URL}/basic-data/color_mapping", headers=headers_admin
+).json())
+_INITIAL_COLOR_COUNT = len(requests.get(
+    f"{BASE_URL}/basic-data/color", headers=headers_admin
+).json())
 
 
 # =========================================================================
@@ -100,13 +109,14 @@ for item in pt_items:
           item["sort_order"] == expected_order,
           f"expected {expected_order}, got {item['sort_order']}")
 
-# List color_mapping (no seed data -> empty)
+# List color_mapping (check initial count)
 resp = requests.get(f"{BASE_URL}/basic-data/color_mapping", headers=headers_admin)
 check_status(resp, 200)
 cm_items = resp.json()
 check("List color_mapping returns list", isinstance(cm_items, list))
-check("color_mapping is empty initially", len(cm_items) == 0,
-      f"got {len(cm_items)} items")
+check("color_mapping has expected initial count",
+      len(cm_items) == _INITIAL_CM_COUNT,
+      f"got {len(cm_items)} items (expected {_INITIAL_CM_COUNT})")
 
 # List non-existent category -> empty list
 resp = requests.get(f"{BASE_URL}/basic-data/nonexistent_category", headers=headers_admin)
@@ -190,11 +200,12 @@ check("Item with sort_order=0 preserves value", white["sort_order"] == 0,
       f"got {white['sort_order']}")
 print(f"  Created color_mapping ID={white['id']}: {white['code']} sort_order=0")
 
-# Verify color_mapping list now has 4 items
+# Verify color_mapping list now has 4 added items
 resp = requests.get(f"{BASE_URL}/basic-data/color_mapping", headers=headers_admin)
 check_status(resp, 200)
-check("color_mapping now has 4 items", len(resp.json()) == 4,
-      f"got {len(resp.json())} items")
+check("color_mapping now has 4 new items",
+      len(resp.json()) == _INITIAL_CM_COUNT + 4,
+      f"got {len(resp.json())} items (expected {_INITIAL_CM_COUNT + 4})")
 
 
 # =========================================================================
@@ -333,8 +344,9 @@ if white['id'] in created_ids:
 resp = requests.get(f"{BASE_URL}/basic-data/color_mapping", headers=headers_admin)
 check_status(resp, 200)
 items_after_delete = resp.json()
-check("Deleted item removed from list", len(items_after_delete) == 3,
-      f"got {len(items_after_delete)} items")
+check("Deleted item removed from list",
+      len(items_after_delete) == _INITIAL_CM_COUNT + 3,
+      f"got {len(items_after_delete)} items (expected {_INITIAL_CM_COUNT + 3})")
 deleted_ids = [item["id"] for item in items_after_delete]
 check("Deleted item id not in list", white['id'] not in deleted_ids)
 
@@ -360,28 +372,72 @@ check("Delete already-deleted returns 404", resp.status_code == 404,
 # =========================================================================
 print("\n=== 6. COLOR MAPPING ENDPOINT ===")
 
+# Create items in "color" category for mapping endpoint test
+resp = requests.post(f"{BASE_URL}/basic-data/color", headers=headers_admin, json={
+    "category": "color",
+    "code": f"测试红_{SUFFIX}",
+    "value": "R001",
+    "sort_order": 1
+})
+check_status(resp, 200)
+red_map = resp.json()
+created_color_ids.append(red_map["id"])
+
+resp = requests.post(f"{BASE_URL}/basic-data/color", headers=headers_admin, json={
+    "category": "color",
+    "code": f"测试蓝_{SUFFIX}",
+    "value": "B001",
+    "sort_order": 2
+})
+check_status(resp, 200)
+blue_map = resp.json()
+created_color_ids.append(blue_map["id"])
+
 # Get color mapping
 resp = requests.get(f"{BASE_URL}/basic-data/mapping/color")
 check_status(resp, 200)
 mapping = resp.json()
 check("Color mapping returns dict", isinstance(mapping, dict))
 
-# Should include items with non-empty value
-check("Mapping includes red",
-      mapping.get(f"红色_{SUFFIX}") == "#FF0000",
+# Should include newly created items from "color" category
+check("Mapping includes test-red",
+      mapping.get(f"测试红_{SUFFIX}") == "R001",
       f"got {mapping}")
-check("Mapping includes blue",
-      mapping.get(f"蓝色_{SUFFIX}") == "#0000FF",
+check("Mapping includes test-blue",
+      mapping.get(f"测试蓝_{SUFFIX}") == "B001",
       f"got {mapping}")
 
-# Should NOT include green (value was empty)
-check("Mapping excludes items without value",
-      f"绿色_{SUFFIX}" not in mapping,
+# Should include existing seed color items
+check("Mapping includes seed color items",
+      "大红" in mapping,
       f"mapping keys: {list(mapping.keys())}")
 
-# Should NOT include deleted white item
+# Create a value-less item in "color" category
+resp = requests.post(f"{BASE_URL}/basic-data/color", headers=headers_admin, json={
+    "category": "color",
+    "code": f"测试空_{SUFFIX}",
+    "sort_order": 3
+})
+check_status(resp, 200)
+empty_color = resp.json()
+created_color_ids.append(empty_color["id"])
+
+check("Mapping excludes items without value",
+      f"测试空_{SUFFIX}" not in mapping)
+
+# Delete one item and verify it is excluded
+resp = requests.delete(
+    f"{BASE_URL}/basic-data/color/{blue_map['id']}",
+    headers=headers_admin
+)
+check_status(resp, 200)
+if blue_map['id'] in created_color_ids:
+    created_color_ids.remove(blue_map['id'])
+
+resp = requests.get(f"{BASE_URL}/basic-data/mapping/color")
+mapping_after_del = resp.json()
 check("Mapping excludes deleted items",
-      f"白色_{SUFFIX}" not in mapping)
+      f"测试蓝_{SUFFIX}" not in mapping_after_del)
 
 # Endpoint works without auth
 resp = requests.get(f"{BASE_URL}/basic-data/mapping/color")
@@ -474,11 +530,23 @@ created_ids.append(special_item["id"])
 check("Create with special chars in code", special_item["code"] == special_code,
       f"got '{special_item['code']}'")
 
+# Create a color-category item to verify mapping inclusion
+special_color_code = f"特殊/符号&空格_{SUFFIX}_color"
+resp = requests.post(f"{BASE_URL}/basic-data/color", headers=headers_admin, json={
+    "category": "color",
+    "code": special_color_code,
+    "value": "#123456",
+    "sort_order": 200
+})
+check_status(resp, 200)
+special_color_item = resp.json()
+created_color_ids.append(special_color_item["id"])
+
 # Verify in mapping
 resp = requests.get(f"{BASE_URL}/basic-data/mapping/color")
 check_status(resp, 200)
 mapping = resp.json()
-check("Special char item in mapping", mapping.get(special_code) == "#123456")
+check("Special char item in mapping", mapping.get(special_color_code) == "#123456")
 
 # Create item with very long values
 long_code = "A" * 90
@@ -522,6 +590,15 @@ for item_id in created_ids:
     status = "ok" if resp.status_code == 200 else f"fail({resp.status_code})"
     print(f"  Delete ID={item_id}: {status}")
 
+# Also clean up items in "color" category
+for item_id in created_color_ids:
+    resp = requests.delete(
+        f"{BASE_URL}/basic-data/color/{item_id}",
+        headers=headers_admin
+    )
+    status = "ok" if resp.status_code == 200 else f"fail({resp.status_code})"
+    print(f"  Delete color ID={item_id}: {status}")
+
 # Also clean up the test packaging_type
 resp = requests.delete(
     f"{BASE_URL}/basic-data/packaging_type/{new_pt['id']}",
@@ -529,10 +606,11 @@ resp = requests.delete(
 )
 print(f"  Delete packaging_type ID={new_pt['id']}: {'ok' if resp.status_code == 200 else 'fail(' + str(resp.status_code) + ')'}")
 
-# Verify clean state: color_mapping back to 0
+# Verify clean state: color_mapping back to initial count
 resp = requests.get(f"{BASE_URL}/basic-data/color_mapping", headers=headers_admin)
-check("color_mapping back to empty after cleanup", len(resp.json()) == 0,
-      f"got {len(resp.json())} items remaining")
+check("color_mapping back to initial count after cleanup",
+      len(resp.json()) == _INITIAL_CM_COUNT,
+      f"got {len(resp.json())} items (expected {_INITIAL_CM_COUNT})")
 
 # Verify packaging_type back to 4
 resp = requests.get(f"{BASE_URL}/basic-data/packaging_type", headers=headers_admin)

@@ -2,6 +2,75 @@
   <div>
     <h2>基础数据维护</h2>
     <el-tabs v-model="activeTab">
+      <el-tab-pane label="工序管理" name="process_steps">
+        <div style="margin-bottom:10px">
+          <el-button type="primary" size="small" @click="openStepCreate">新建工序</el-button>
+        </div>
+        <el-table :data="processSteps" stripe v-loading="stepLoading" max-height="600">
+          <el-table-column prop="step_code" label="工序编码" width="120" />
+          <el-table-column prop="step_name" label="工序名称" width="150" />
+          <el-table-column prop="sort_order" label="排序" width="70" />
+          <el-table-column label="负责人" min-width="200">
+            <template #default="{ row }">
+              <el-tag v-for="a in row.assignees" :key="a.id" size="small" style="margin:2px">{{ a.display_name }} ({{ a.role }})</el-tag>
+              <span v-if="!row.assignees?.length" style="color:#999">未配置</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="80">
+            <template #default="{ row }">
+              <el-tag :type="row.is_active ? 'success' : 'info'" size="small">{{ row.is_active ? '启用' : '禁用' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="210" fixed="right">
+            <template #default="{ row }">
+              <div style="display:flex;gap:4px;flex-wrap:nowrap">
+                <el-button size="small" text type="primary" @click="openStepEdit(row)">编辑</el-button>
+                <el-button size="small" text type="primary" @click="openStepAssign(row)">负责人</el-button>
+                <el-button size="small" text type="danger" @click="handleStepDelete(row)">删除</el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- 工序编辑 dialog -->
+        <el-dialog v-model="stepForm.visible" :title="stepForm.isEdit ? '编辑工序' : '新建工序'" width="450px">
+          <el-form :model="stepForm.data" label-width="100px">
+            <el-form-item label="工序编码">
+              <el-input v-model="stepForm.data.step_code" :disabled="stepForm.isEdit" />
+            </el-form-item>
+            <el-form-item label="工序名称">
+              <el-input v-model="stepForm.data.step_name" />
+            </el-form-item>
+            <el-form-item label="排序号">
+              <el-input-number v-model="stepForm.data.sort_order" :min="0" />
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-switch v-model="stepForm.data.is_active" active-text="启用" inactive-text="禁用" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="stepForm.visible = false">取消</el-button>
+            <el-button type="primary" @click="confirmStepSave" :loading="stepForm.loading">保存</el-button>
+          </template>
+        </el-dialog>
+
+        <!-- 工序负责人 dialog -->
+        <el-dialog v-model="stepAssign.visible" title="配置工序负责人" width="500px">
+          <div v-if="stepAssign.step">
+            <p style="margin-bottom:12px">工序：<el-tag>{{ stepAssign.step.step_name }}</el-tag></p>
+            <el-checkbox-group v-model="stepAssign.selectedUserIds">
+              <el-checkbox v-for="u in allUsers" :key="u.id" :label="u.id" style="display:flex;margin:6px 0">
+                {{ u.display_name }} ({{ u.role }})
+              </el-checkbox>
+            </el-checkbox-group>
+          </div>
+          <template #footer>
+            <el-button @click="stepAssign.visible = false">取消</el-button>
+            <el-button type="primary" @click="confirmStepAssign" :loading="stepAssign.loading">保存</el-button>
+          </template>
+        </el-dialog>
+      </el-tab-pane>
+
       <el-tab-pane label="颜色映射" name="color">
         <div style="margin-bottom:10px">
           <el-button type="primary" size="small" @click="openAdd">添加颜色</el-button>
@@ -109,8 +178,10 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listBasicData, createBasicData, updateBasicData, deleteBasicData } from '../../api/basicData'
 import { listCustomers } from '../../api/customer'
+import { listProcessSteps, createProcessStep, updateProcessStep, deleteProcessStep, setStepAssignees } from '../../api/production'
+import { listUsers } from '../../api/user'
 
-const activeTab = ref('color')
+const activeTab = ref('process_steps')
 const colorMappingData = ref([])
 const packagingData = ref([])
 const layerTypeData = ref([])
@@ -140,6 +211,81 @@ const editLabel = computed(() => {
   return '名称'
 })
 const dialogTitle = computed(() => (editingId.value ? '编辑' : '添加') + tabLabel.value)
+
+// ── Process Steps ──
+const processSteps = ref([])
+const allUsers = ref([])
+const stepLoading = ref(false)
+const stepForm = ref({ visible: false, isEdit: false, data: { step_code: '', step_name: '', sort_order: 0, is_active: true }, loading: false })
+const stepAssign = ref({ visible: false, step: null, selectedUserIds: [], loading: false })
+
+function openStepCreate() {
+  stepForm.value = { visible: true, isEdit: false, data: { step_code: '', step_name: '', sort_order: 0, is_active: true }, loading: false }
+}
+
+function openStepEdit(row) {
+  stepForm.value = { visible: true, isEdit: true, data: { ...row }, loading: false }
+}
+
+async function confirmStepSave() {
+  stepForm.value.loading = true
+  try {
+    if (stepForm.value.isEdit) {
+      await updateProcessStep(stepForm.value.data.id, stepForm.value.data)
+      ElMessage.success('更新成功')
+    } else {
+      await createProcessStep(stepForm.value.data)
+      ElMessage.success('创建成功')
+    }
+    stepForm.value.visible = false
+    loadStepData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+  finally { stepForm.value.loading = false }
+}
+
+function openStepAssign(row) {
+  stepAssign.value = {
+    visible: true,
+    step: row,
+    selectedUserIds: row.assignees?.map(a => a.id) || [],
+    loading: false,
+  }
+}
+
+async function confirmStepAssign() {
+  stepAssign.value.loading = true
+  try {
+    await setStepAssignees(stepAssign.value.step.id, { user_ids: stepAssign.value.selectedUserIds })
+    ElMessage.success('负责人已配置')
+    stepAssign.value.visible = false
+    loadStepData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+  finally { stepAssign.value.loading = false }
+}
+
+async function handleStepDelete(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除工序「${row.step_name}」？`, '确认')
+    await deleteProcessStep(row.id)
+    ElMessage.success('已删除')
+    loadStepData()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e.response?.data?.detail || '删除失败')
+  }
+}
+
+async function loadStepData() {
+  stepLoading.value = true
+  try {
+    const [sRes, uRes] = await Promise.all([
+      listProcessSteps({ include_inactive: true }),
+      listUsers(),
+    ])
+    processSteps.value = sRes.data
+    allUsers.value = uRes.data
+  } catch { ElMessage.error('加载工序数据失败') }
+  finally { stepLoading.value = false }
+}
 
 async function loadData() {
   try {
@@ -222,5 +368,8 @@ async function handleDelete(row) {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  loadStepData()
+})
 </script>

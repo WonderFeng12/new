@@ -12,4 +12,5 @@ from app.models.process_step import ProcessStep
 from app.models.process_step_assignee import ProcessStepAssignee
 from app.models.production_log import ProductionLog
 from app.models.system_config import SystemConfig
+from app.models.webhook_config import WebhookConfig
 from app.models.mixins import TimestampMixin, SoftDeleteMixin, AuditMixin

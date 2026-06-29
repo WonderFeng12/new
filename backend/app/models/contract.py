@@ -71,6 +71,9 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin, AuditMixin):
     emboss_model = Column(String(100))
     total_amount = Column(DECIMAL(12, 2))
 
+    latest_confirm_version = Column(Integer, default=0)
+    confirm_requested_at = Column(DateTime, nullable=True, comment="最近一次请求确认的时间")
+    last_reminded_at = Column(DateTime, nullable=True, comment="最近一次发送催办提醒的时间")
     status = Column(SAEnum("草稿", "确认", "已下发"), default="草稿")
     is_pushed_down = Column(Boolean, default=False)
     push_down_sheet_id = Column(Integer, nullable=True)

@@ -1,6 +1,8 @@
+import math
 from pydantic import BaseModel
 from typing import Optional, Any
 from datetime import datetime, date
+from app.schemas.contract import ContractOut
 
 
 class ProcessSheetItemCreate(BaseModel):
@@ -30,6 +32,8 @@ class ProcessSheetItemOut(BaseModel):
     image_b_3: Optional[str] = None
     pressed_image: Optional[str] = None
     remark: Optional[str] = None
+    process_remark: Optional[str] = None
+    qty: Optional[float] = 0
 
     class Config:
         from_attributes = True
@@ -53,6 +57,7 @@ class ProcessSheetUpdateItem(BaseModel):
     image_b_3: Optional[str] = None
     pressed_image: Optional[str] = None
     remark: Optional[str] = None
+    qty: Optional[float] = None
 
 
 class ProcessSheetCreate(BaseModel):
@@ -60,21 +65,30 @@ class ProcessSheetCreate(BaseModel):
     contract_item_ids: list[int]
 
 
+class MarkVersionRequest(BaseModel):
+    note: Optional[str] = None
+
+
 class ProcessSheetUpdateDetail(BaseModel):
     detail_data: Optional[dict] = None
     items: Optional[list[ProcessSheetUpdateItem]] = None
+    change_note: Optional[str] = None
 
 
 class ProcessSheetOut(BaseModel):
     id: int
     contract_id: int
     sheet_no: str
-    confirm_version_no: int
+    confirm_version_no: float = 0
     confirm_image_id: Optional[int] = None
     status: str = "草稿"
     confirm_token: Optional[str] = None
     customer_comment: Optional[str] = None
+    version_marked: Optional[bool] = False
+    version_note: Optional[str] = None
     detail_data: Optional[Any] = None
+    contract: Optional[ContractOut] = None
+    contract_snapshot: Optional[Any] = None
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
     created_at: Optional[datetime] = None

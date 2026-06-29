@@ -113,7 +113,7 @@ class YarnPlanRequest(BaseModel):
 
 
 class PushDownRequest(BaseModel):
-    pass
+    process_remark: Optional[str] = ""
 
 
 @router.post("/contract-items/{id}/advance")
@@ -180,7 +180,7 @@ def push_down_item(
 ):
     if current_user.role not in ("销售经理", "生产专员"):
         raise HTTPException(status_code=403, detail="权限不足")
-    result = prod_service.push_down_item_to_process_sheet(db, id, current_user.id)
+    result = prod_service.push_down_item_to_process_sheet(db, id, current_user.id, data.process_remark or "")
     if not result:
         raise HTTPException(status_code=400, detail="下推失败")
     return {"message": "工艺单已下推", "sheet_no": result.sheet_no, "sheet_id": result.id}
@@ -307,19 +307,3 @@ def update_my_wecom(
     return {"ok": True}
 
 
-# ── User list (for assignee selection) ──
-
-
-@router.get("/users")
-def list_users(db: Session = Depends(get_db)):
-    users = db.query(User).filter(User.is_deleted == False).all()
-    return [
-        {
-            "id": u.id,
-            "display_name": u.display_name,
-            "role": u.role,
-            "wecom_userid": u.wecom_userid,
-            "username": u.username,
-        }
-        for u in users
-    ]

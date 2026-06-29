@@ -1,12 +1,17 @@
 import json
+from datetime import date, datetime
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from app.models.contract import Contract
 from app.models.contract_item import ContractItem
-from sqlalchemy.orm import defaultload
+from app.models.customer import Customer
+from app.models.spec import Spec
+from app.models.process_sheet import ProcessSheet
+from app.models.process_sheet_item import ProcessSheetItem
 from app.schemas.contract import ContractCreate, ContractUpdate
 from app.schemas.contract_item import ContractItemCreate
 from fastapi import HTTPException
-from app.services.production import item_has_process_sheet
+from app.services.production import get_process_sheet_for_item
 
 
 def _parse_code_rule(value: str) -> dict:
@@ -55,14 +60,14 @@ def generate_contract_no(db: Session, customer_id: int = None) -> str:
     return f"HT{today.strftime('%Y%m')}{seq:04d}"
 
 
-def compute_contract_status(db: Session, contract_id: int, items: list = None) -> str:
+def compute_contract_status(db: Session, contract_id: int, items: list = None, current_status: str = None) -> str:
     """Derive the display-friendly contract status from its items' production_status."""
     if items is None:
         items = db.query(ContractItem).filter(
             ContractItem.contract_id == contract_id
         ).all()
     if not items:
-        return "草稿"
+        return current_status or "草稿"
     statuses = [i.production_status for i in items]
     has_any = any(s for s in statuses)
     all_cancelled = all(s == "cancelled" for s in statuses if s) and has_any
@@ -77,7 +82,7 @@ def compute_contract_status(db: Session, contract_id: int, items: list = None) -
         return "已下发"
     if has_any:
         return "确认"
-    return "草稿"
+    return current_status or "草稿"
 
 
 def list_contracts(
@@ -88,9 +93,39 @@ def list_contracts(
 ):
     q = db.query(Contract).filter(Contract.is_deleted == False)
     if keyword:
-        q = q.filter(
-            Contract.contract_no.like(f"%{keyword}%")
-        )
+        like = f"%{keyword}%"
+        q = q.filter(or_(
+            Contract.contract_no.like(like),
+            Contract.id.in_(
+                db.query(ProcessSheet.contract_id).filter(
+                    ProcessSheet.is_deleted == False,
+                    ProcessSheet.sheet_no.like(like),
+                )
+            ),
+            Contract.id.in_(
+                db.query(ContractItem.contract_id).filter(
+                    ContractItem.yarn_plan_no.like(like),
+                )
+            ),
+            Contract.id.in_(
+                db.query(ContractItem.contract_id).join(Spec).filter(
+                    or_(
+                        Spec.spec_name.like(like),
+                        Spec.spec_description.like(like),
+                    )
+                )
+            ),
+            Contract.id.in_(
+                db.query(ContractItem.contract_id).filter(
+                    ContractItem.packaging_type.like(like),
+                )
+            ),
+            Contract.customer_id.in_(
+                db.query(Customer.id).filter(
+                    Customer.name.like(like),
+                )
+            ),
+        ))
     if role == "业务员" and user_id:
         from app.models.user import User
         user = db.query(User).filter(User.id == user_id).first()
@@ -102,9 +137,8 @@ def list_contracts(
         joinedload(Contract.items).joinedload(ContractItem.spec),
     ).all()
     for c in contracts:
-        c.computed_status = compute_contract_status(db, c.id, c.items)
-        for item in c.items:
-            item.has_process_sheet = item_has_process_sheet(db, item.id)
+        c.computed_status = compute_contract_status(db, c.id, c.items, c.status)
+        _enrich_item_sheets(db, c.items)
     return contracts
 
 
@@ -117,10 +151,28 @@ def get_contract(db: Session, id: int):
         joinedload(Contract.items).joinedload(ContractItem.spec),
     ).first()
     if contract:
-        contract.computed_status = compute_contract_status(db, contract.id, contract.items)
-        for item in contract.items:
-            item.has_process_sheet = item_has_process_sheet(db, item.id)
+        contract.computed_status = compute_contract_status(db, contract.id, contract.items, contract.status)
+        _enrich_item_sheets(db, contract.items)
     return contract
+
+
+def _enrich_item_sheets(db: Session, items: list):
+    """Populate process sheet info and yarn plan info on contract items."""
+    for item in items:
+        sheet_info = get_process_sheet_for_item(db, item.id)
+        if sheet_info:
+            item.has_process_sheet = True
+            item.process_sheet_id = sheet_info["id"]
+            item.process_sheet_no = sheet_info["sheet_no"]
+            item.process_sheet_status = sheet_info["status"]
+            item.process_sheet_version = sheet_info.get("confirm_version_no", 0)
+        else:
+            item.has_process_sheet = False
+        if item.yarn_plan_user_id:
+            from app.models.user import User
+            u = db.query(User).filter(User.id == item.yarn_plan_user_id).first()
+            if u:
+                item.yarn_plan_user_name = u.display_name
 
 
 def create_contract(db: Session, data: ContractCreate, username: str):
@@ -169,12 +221,29 @@ def create_contract(db: Session, data: ContractCreate, username: str):
     return get_contract(db, contract.id)
 
 
-def update_contract(db: Session, id: int, data: ContractUpdate, username: str):
+def _can_edit_confirmed(db: Session, role: str) -> bool:
+    """Check if a role is allowed to edit confirmed contracts."""
+    from app.models.basic_data import BasicData
+    config = db.query(BasicData).filter(
+        BasicData.category == "contract_permissions",
+        BasicData.code == "edit_confirmed_roles",
+    ).first()
+    if not config or not config.value:
+        return False
+    try:
+        allowed = json.loads(config.value)
+        return role in allowed
+    except (json.JSONDecodeError, TypeError):
+        return False
+
+
+def update_contract(db: Session, id: int, data: ContractUpdate, username: str, user_role: str = ""):
     contract = get_contract(db, id)
     if not contract:
         return None
     if contract.status == "已下发":
-        raise HTTPException(status_code=400, detail="合同已下发，不可修改")
+        if not _can_edit_confirmed(db, user_role):
+            raise HTTPException(status_code=400, detail="合同已下发，不可修改")
     if contract.is_pushed_down:
         from app.models.process_sheet import ProcessSheet
         sheet = db.query(ProcessSheet).filter(
@@ -182,9 +251,11 @@ def update_contract(db: Session, id: int, data: ContractUpdate, username: str):
             ProcessSheet.is_deleted == False
         ).first()
         if sheet and sheet.status == "已下发":
-            raise HTTPException(status_code=400, detail="工艺单已下发，不可修改合同")
+            if not _can_edit_confirmed(db, user_role):
+                raise HTTPException(status_code=400, detail="工艺单已下发，不可修改合同")
 
     items_data = data.model_dump(exclude_unset=True).pop("items", None)
+    original_status = contract.status
     for field, value in data.model_dump(exclude_unset=True, exclude={"items"}).items():
         setattr(contract, field, value)
 
@@ -247,6 +318,19 @@ def update_contract(db: Session, id: int, data: ContractUpdate, username: str):
                 db.delete(existing)
         contract.total_amount = total
 
+    # Log edits on non-草稿 contracts
+    if original_status != "草稿":
+        from app.models.production_log import ProductionLog
+        log = ProductionLog(
+            contract_id=contract.id,
+            from_status=original_status,
+            to_status=contract.status,
+            operation_type="重新编辑",
+            operator_id=None,
+            remark=f"合同已修改（由{username}操作）",
+        )
+        db.add(log)
+
     contract.updated_by = username
     db.commit()
     db.refresh(contract)
@@ -287,6 +371,8 @@ def manual_confirm_contract(db: Session, contract_id: int, user_id: int, remark:
     old_status = contract.status
     contract.status = "确认"
     contract.updated_by = user.display_name or user.username
+    if not contract.latest_confirm_version:
+        contract.latest_confirm_version = 1
 
     log = ProductionLog(
         contract_id=contract.id,
@@ -313,3 +399,80 @@ def get_available_contracts(db: Session):
     ).all()
 
 
+def reopen_edit(db: Session, contract_id: int, user_id: int):
+    """Log that a contract has been reopened for editing. Increments version number."""
+    from app.models.production_log import ProductionLog
+    from app.models.user import User
+
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id, Contract.is_deleted == False
+    ).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="合同不存在")
+    if contract.status == "草稿":
+        raise HTTPException(status_code=400, detail="草稿合同可直接编辑，无需重新打开")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if user.role not in ("销售经理", "生产专员"):
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    new_version = (contract.latest_confirm_version or 0) + 1
+    contract.latest_confirm_version = new_version
+
+    log = ProductionLog(
+        contract_id=contract.id,
+        from_status=contract.status,
+        to_status=contract.status,
+        operation_type="重新编辑",
+        operator_id=user_id,
+        remark=f"合同重新编辑(V{new_version})，由{user.display_name}操作",
+    )
+    db.add(log)
+    db.commit()
+    return True
+
+
+def update_confirm_request_time(db: Session, contract_id: int, requested_at):
+    """Record when a confirm request was sent (for reminder tracking)."""
+    from datetime import datetime
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if contract:
+        contract.confirm_requested_at = requested_at
+        db.commit()
+
+
+def get_contracts_pending_confirm(db: Session) -> list[dict]:
+    """Get all contracts that have been requested for confirm but not yet confirmed.
+
+    Returns list of dicts with contract_no and requested_at for reminder purposes.
+    """
+    today = date.today()
+    contracts = db.query(Contract).filter(
+        Contract.is_deleted == False,
+        Contract.status == "草稿",
+        Contract.confirm_requested_at.isnot(None),
+    ).all()
+
+    result = []
+    for c in contracts:
+        # Only include if not already reminded today
+        if c.last_reminded_at and c.last_reminded_at.date() == today:
+            continue
+        result.append({
+            "contract_no": c.contract_no,
+            "requested_at": c.confirm_requested_at.strftime("%Y-%m-%d %H:%M") if c.confirm_requested_at else "",
+        })
+    return result
+
+
+def mark_reminded(db: Session, contract_no: str):
+    """Mark a contract as having been reminded today."""
+    from datetime import datetime
+    contract = db.query(Contract).filter(
+        Contract.contract_no == contract_no
+    ).first()
+    if contract:
+        contract.last_reminded_at = datetime.now()
+        db.commit()

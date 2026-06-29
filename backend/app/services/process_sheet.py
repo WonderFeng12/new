@@ -1,11 +1,11 @@
 import json
+import math
 import uuid
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException
 from app.models.contract import Contract
 from app.models.process_sheet import ProcessSheet
 from app.models.process_sheet_item import ProcessSheetItem
-from app.models.confirm_image import ConfirmImage
 
 
 def generate_sheet_no(db: Session) -> str:
@@ -48,7 +48,6 @@ def list_sheets(db: Session, keyword: str = "", user_id: int | None = None, role
             q = q.join(Contract).filter(Contract.created_by == username)
     return q.order_by(ProcessSheet.id.desc()).options(
         joinedload(ProcessSheet.contract),
-        joinedload(ProcessSheet.confirm_image),
         joinedload(ProcessSheet.items),
     ).all()
 
@@ -58,7 +57,6 @@ def get_sheet(db: Session, id: int):
         ProcessSheet.id == id, ProcessSheet.is_deleted == False
     ).options(
         joinedload(ProcessSheet.contract),
-        joinedload(ProcessSheet.confirm_image),
         joinedload(ProcessSheet.items),
     ).first()
 
@@ -68,14 +66,14 @@ def create_sheet_from_items(db: Session, contract_id: int, contract_item_ids: li
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if not contract or contract.is_deleted:
         raise HTTPException(status_code=404, detail="合同不存在")
-    if contract.status != "保存":
+    if contract.status != "确认":
         raise HTTPException(status_code=400, detail="合同尚未确认")
 
     sheet_no = generate_sheet_no(db)
     sheet = ProcessSheet(
         contract_id=contract_id,
         sheet_no=sheet_no,
-        confirm_version_no=contract.latest_confirm_version,
+        confirm_version_no=contract.latest_confirm_version or 0,
         status="草稿",
         created_by=username,
         updated_by=username,
@@ -110,13 +108,17 @@ def create_sheet_from_items(db: Session, contract_id: int, contract_item_ids: li
     return get_sheet(db, sheet.id)
 
 
-def update_sheet_detail(db: Session, id: int, detail_data: dict | None, items_data: list | None, username: str):
+def update_sheet_detail(db: Session, id: int, detail_data: dict | None, items_data: list | None, username: str, change_note: str | None = None):
     """Update process sheet detail data and item-level production details."""
     sheet = get_sheet(db, id)
     if not sheet:
         raise HTTPException(status_code=404, detail="工艺单不存在")
     if sheet.status != "草稿":
         raise HTTPException(status_code=400, detail="工艺单已确认或已下发，不可修改")
+
+    # If version is marked, change reason is required
+    if sheet.version_marked and not change_note:
+        raise HTTPException(status_code=400, detail="版本已标记用于客户沟通，每次更改请填写原因")
 
     if detail_data is not None:
         sheet.detail_data = detail_data
@@ -135,58 +137,32 @@ def update_sheet_detail(db: Session, id: int, detail_data: dict | None, items_da
                 if hasattr(psi, field):
                     setattr(psi, field, value)
 
+    # Auto-increment version by 0.01 if version tracking has started
+    current_v = float(sheet.confirm_version_no or 0)
+    if current_v > 0:
+        sheet.confirm_version_no = current_v + 0.01
     sheet.updated_by = username
     db.commit()
     db.refresh(sheet)
     return get_sheet(db, sheet.id)
 
 
-def push_down_from_contract(db: Session, contract_id: int, username: str):
-    contract = db.query(Contract).filter(Contract.id == contract_id).first()
-    if not contract or contract.is_deleted:
-        raise HTTPException(status_code=404, detail="合同不存在")
-    if contract.status != "保存":
-        raise HTTPException(status_code=400, detail="合同尚未确认，无法下推")
-    if contract.is_pushed_down:
-        raise HTTPException(status_code=400, detail="合同已下推，不可重复操作")
+def mark_version(db: Session, id: int, note: str | None, username: str):
+    """Mark current version for customer communication. First time generates V0.11."""
+    sheet = get_sheet(db, id)
+    if not sheet:
+        raise HTTPException(status_code=404, detail="工艺单不存在")
+    if sheet.status != "草稿":
+        raise HTTPException(status_code=400, detail="工艺单已确认或已下发")
 
-    latest_image = db.query(ConfirmImage).filter(
-        ConfirmImage.contract_id == contract_id,
-        ConfirmImage.version_no == contract.latest_confirm_version,
-    ).first()
+    # First time: generate initial communication version V0.11
+    current_v = float(sheet.confirm_version_no or 0)
+    if current_v == 0:
+        sheet.confirm_version_no = 0.11
 
-    sheet_no = generate_sheet_no(db)
-    sheet = ProcessSheet(
-        contract_id=contract_id,
-        sheet_no=sheet_no,
-        confirm_version_no=contract.latest_confirm_version,
-        confirm_image_id=latest_image.id if latest_image else None,
-        status="草稿",
-        created_by=username,
-        updated_by=username,
-    )
-    db.add(sheet)
-    db.flush()
-
-    # Create ProcessSheetItems for ALL contract items
-    from app.models.contract_item import ContractItem
-    all_items = db.query(ContractItem).filter(
-        ContractItem.contract_id == contract_id,
-    ).order_by(ContractItem.line_no).all()
-    for idx, ci in enumerate(all_items):
-        psi = ProcessSheetItem(
-            process_sheet_id=sheet.id,
-            contract_item_id=ci.id,
-            line_no=idx + 1,
-            spec_id=ci.spec_id,
-            packaging_type=ci.packaging_type or '',
-        )
-        db.add(psi)
-
-    contract.is_pushed_down = True
-    contract.push_down_sheet_id = sheet.id
-    contract.status = "已下发"
-    contract.updated_by = username
+    sheet.version_marked = True
+    sheet.version_note = note or ""
+    sheet.updated_by = username
     db.commit()
     db.refresh(sheet)
     return get_sheet(db, sheet.id)
@@ -198,6 +174,14 @@ def confirm_sheet(db: Session, id: int, username: str):
         raise HTTPException(status_code=404, detail="工艺单不存在")
     if sheet.status != "草稿":
         raise HTTPException(status_code=400, detail="工艺单状态不正确")
+
+    # V0.xx → V1, V1.x → V2, V2.x → V3 …
+    current = float(sheet.confirm_version_no or 0)
+    if current <= 0:
+        sheet.confirm_version_no = 1.0
+    else:
+        sheet.confirm_version_no = math.floor(current) + 1.0
+    sheet.version_marked = False
     sheet.status = "保存"
     sheet.updated_by = username
     db.commit()
@@ -212,10 +196,19 @@ def dispatch_sheet(db: Session, id: int, username: str):
         raise HTTPException(status_code=400, detail="工艺单未确认，无法下发")
 
     contract = sheet.contract
-    if sheet.confirm_version_no < contract.latest_confirm_version:
+    # Use contract_snapshot to determine the contract version at push-down time
+    snap = sheet.contract_snapshot or {}
+    if isinstance(snap, str):
+        import json
+        try:
+            snap = json.loads(snap)
+        except (json.JSONDecodeError, TypeError):
+            snap = {}
+    base_version = snap.get("latest_confirm_version", 0) or 0
+    if base_version < (contract.latest_confirm_version or 0):
         raise HTTPException(
             status_code=400,
-            detail=f"合同已有新版本(V{contract.latest_confirm_version})，当前工艺单基于V{sheet.confirm_version_no}，请重新生成工艺单",
+            detail=f"合同已有新版本(V{contract.latest_confirm_version})，当前工艺单基于V{base_version}，请重新生成工艺单",
         )
 
     sheet.status = "已下发"
@@ -225,25 +218,35 @@ def dispatch_sheet(db: Session, id: int, username: str):
     return get_sheet(db, id)
 
 
-def create_sheet_from_contract(db: Session, contract_id: int, username: str):
-    """Create process sheet by selecting an available contract (non-push-down)."""
-    contract = db.query(Contract).filter(Contract.id == contract_id).first()
-    if not contract or contract.is_deleted:
-        raise HTTPException(status_code=404, detail="合同不存在")
-    if contract.status != "保存":
-        raise HTTPException(status_code=400, detail="合同尚未确认")
-    if contract.is_pushed_down:
-        raise HTTPException(status_code=400, detail="合同已下推")
-
-    return push_down_from_contract(db, contract_id, username)
-
-
 def delete_sheet(db: Session, id: int):
     sheet = db.query(ProcessSheet).filter(ProcessSheet.id == id).first()
     if not sheet:
         return False
     if sheet.status == "已下发":
         raise HTTPException(status_code=400, detail="工艺单已下发，不可删除")
+
+    contract_id = sheet.contract_id
+
+    # Delete associated process sheet items
+    db.query(ProcessSheetItem).filter(
+        ProcessSheetItem.process_sheet_id == id
+    ).delete()
+
+    # Reset contract push-down state
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if contract:
+        if contract.push_down_sheet_id == id:
+            contract.is_pushed_down = False
+            contract.push_down_sheet_id = None
+        # Revert status if no remaining process sheets
+        remaining = db.query(ProcessSheet).filter(
+            ProcessSheet.contract_id == contract_id,
+            ProcessSheet.is_deleted == False,
+            ProcessSheet.id != id,  # the one being deleted
+        ).count()
+        if remaining == 0 and contract.status == "已下发":
+            contract.status = "确认"
+
     sheet.is_deleted = True
     db.commit()
     return True

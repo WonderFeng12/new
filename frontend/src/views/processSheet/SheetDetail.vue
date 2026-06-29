@@ -4,24 +4,43 @@
     <el-card v-loading="loading" style="margin:16px 0">
       <template #header>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span>工艺单号: {{ sheet?.sheet_no }}</span>
+          <span>
+            工艺单号: {{ sheet?.sheet_no }}
+            <el-tag v-if="formatVersion(sheet?.confirm_version_no)" size="small" type="info" style="margin-left:8px">{{ formatVersion(sheet?.confirm_version_no) }}</el-tag>
+            <el-tag v-if="sheet?.version_marked" size="small" type="warning" style="margin-left:8px">沟通中</el-tag>
+          </span>
           <span>
             <el-tag :type="statusType(sheet?.status)" size="small">{{ sheet?.status }}</el-tag>
-            <el-button size="small" type="success" style="margin-left:8px" @click="handleConfirm" :disabled="sheet?.status!=='草稿'">确认工艺单</el-button>
+            <el-button size="small" type="warning" style="margin-left:8px" @click="showMarkDialog = true" :disabled="sheet?.status!=='草稿'" :plain="!!sheet?.version_marked">客户沟通</el-button>
+            <el-button size="small" type="success" style="margin-left:8px" @click="handleConfirm" :disabled="sheet?.status!=='草稿' || !formatVersion(sheet?.confirm_version_no)">客户确认</el-button>
             <el-button size="small" type="primary" @click="handleDispatch" :disabled="sheet?.status!=='保存'">下发工艺单</el-button>
           </span>
         </div>
       </template>
 
+      <!-- 版本过期警告：对比下推时的合同版本与当前合同版本 -->
+      <el-alert v-if="sheet && (snapshotContractVersion || 0) > 0 && (snapshotContractVersion || 0) < (sheet.contract?.latest_confirm_version || 0)" title="合同已更新" type="warning" show-icon :closable="false" style="margin-bottom:16px">
+        <template #default>
+          合同 {{ sheet.contract.contract_no }} 已有新版本(V{{ sheet.contract.latest_confirm_version }})，
+          当前工艺单基于 V{{ snapshotContractVersion }}，建议重新生成工艺单。
+          <el-link type="warning" :underline="false" style="margin-left:8px" @click="$router.push(`/contracts/${sheet.contract.id}`)">查看合同</el-link>
+        </template>
+      </el-alert>
+
       <el-descriptions :column="3" border>
         <el-descriptions-item label="合同号">{{ sheet?.contract?.contract_no }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ sheet?.contract?.customer?.name }}</el-descriptions-item>
-        <el-descriptions-item label="合同版本">V{{ sheet?.confirm_version_no }}</el-descriptions-item>
+        <el-descriptions-item v-if="formatVersion(sheet?.confirm_version_no)" label="工艺单版本">
+          {{ formatVersion(sheet?.confirm_version_no) }}
+          <el-tag v-if="sheet?.version_note" size="small" type="info" style="margin-left:4px">{{ sheet?.version_note }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item v-else label="工艺单版本">—</el-descriptions-item>
         <el-descriptions-item label="状态">{{ sheet?.status }}</el-descriptions-item>
         <el-descriptions-item label="创建人">{{ sheet?.created_by }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ sheet?.created_at }}</el-descriptions-item>
         <el-descriptions-item label="合同日期">{{ sheet?.contract?.contract_date }}</el-descriptions-item>
-        <el-descriptions-item label="总金额">¥{{ sheet?.contract?.total_amount?.toFixed(2) }}</el-descriptions-item>
+        <el-descriptions-item label="交货日期">{{ sheet?.items?.[0]?.delivery_date || sheet?.contract?.delivery_date || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="数量">{{ sheet?.items?.[0]?.qty || 0 }} 条</el-descriptions-item>
       </el-descriptions>
 
       <el-divider>行项目</el-divider>
@@ -46,13 +65,11 @@
         <el-table-column label="花型数" width="70">
           <template #default="{ row }">{{ row.pattern_count || 0 }}</template>
         </el-table-column>
+        <el-table-column label="数量" width="80">
+          <template #default="{ row }">{{ row.qty || 0 }}</template>
+        </el-table-column>
         <el-table-column label="交货日期" width="110">
           <template #default="{ row }">{{ row.delivery_date || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="价格" min-width="120">
-          <template #default="{ row }">
-            ¥{{ formatPrice(row.unit_price) }} × {{ row.qty || 0 }}
-          </template>
         </el-table-column>
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row, $index }">
@@ -61,6 +78,38 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-divider>版本信息</el-divider>
+      <div style="margin-bottom:16px">
+        <el-descriptions :column="3" border size="small">
+          <el-descriptions-item label="工艺单版本">
+            <el-tag size="small" :type="formatVersion(sheet?.confirm_version_no) ? 'primary' : 'info'">
+              {{ formatVersion(sheet?.confirm_version_no) || '未开始' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="沟通标记">
+            <el-tag v-if="sheet?.version_marked" size="small" type="warning">沟通中</el-tag>
+            <span v-else style="color:#999">—</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="版本说明">{{ sheet?.version_note || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ sheet?.created_by || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ sheet?.created_at || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间">{{ sheet?.updated_at || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ sheet?.status || '—' }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+
+      <el-divider>操作日志</el-divider>
+      <el-table :data="contractLogs" stripe size="small" v-if="contractLogs.length" v-loading="logsLoading">
+        <el-table-column prop="created_at" label="时间" width="160" />
+        <el-table-column prop="operation_type" label="操作" width="100" />
+        <el-table-column prop="contract_item_id" label="行项目ID" width="80" />
+        <el-table-column prop="from_status" label="从" width="110" />
+        <el-table-column prop="to_status" label="到" width="110" />
+        <el-table-column prop="operator_name" label="操作人" width="100" />
+        <el-table-column prop="remark" label="备注" min-width="160" />
+      </el-table>
+      <div v-else style="color:#999;text-align:center;padding:16px">暂无操作日志</div>
 
       <!-- 保存后在只读模式下显示花型信息 -->
       <div v-if="sheet?.status !== '草稿' && items.length">
@@ -120,7 +169,7 @@
               <el-row :gutter="20">
                 <el-col :span="8">
                   <el-form-item label="包装方式">
-                    <el-select v-model="activeItem.packaging_type" style="width:100%" placeholder="选择包装方式">
+                    <el-select v-model="activeItem.packaging_type" style="width:100%" placeholder="选择包装方式" disabled>
                       <el-option v-for="pt in packagingTypes" :key="pt.code" :label="pt.code" :value="pt.code" />
                     </el-select>
                   </el-form-item>
@@ -164,7 +213,7 @@
               <template v-if="activeItem.pattern_count > 0">
                 <div v-for="(p, pi) in activeItem.pattern_data" :key="pi" style="border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:8px">
                   <el-row :gutter="8" type="flex" align="middle">
-                    <el-col :span="8" style="display:flex;align-items:center;min-height:40px;padding-left:0">
+                    <el-col :span="7" style="display:flex;align-items:center;min-height:40px;padding-left:0">
                       <el-form-item :label="'花型代码' + (pi + 1)" label-width="85px" label-style="padding-left:0" style="margin-bottom:0">
                         <el-input v-model="p.code" />
                       </el-form-item>
@@ -181,7 +230,7 @@
                         <el-input-number v-model="p.qty" :min="0" :precision="0" size="small" style="width:100%" :controls="false" />
                       </el-form-item>
                     </el-col>
-                    <el-col :span="3" style="display:flex;align-items:center;min-height:40px">
+                    <el-col :span="4" style="display:flex;align-items:center;min-height:40px">
                       <el-form-item label="色号" label-width="50px" style="margin-bottom:0">
                         <el-input v-model="p.binding_color_no" disabled />
                       </el-form-item>
@@ -324,7 +373,36 @@
         </el-tabs>
       </template>
       <template #footer>
+        <el-button type="primary" @click="saveItemDetail">保存</el-button>
         <el-button @click="showDetailDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 客户沟通对话框 -->
+    <el-dialog v-model="showMarkDialog" title="客户沟通" width="480px">
+      <p v-if="formatVersion(sheet?.confirm_version_no)" style="margin-bottom:12px;color:#666">
+        当前版本 {{ formatVersion(sheet?.confirm_version_no) }}，将标记用于客户沟通。每次保存版本自动 +0.01。
+      </p>
+      <p v-else style="margin-bottom:12px;color:#666">
+        将生成初始沟通版本 <strong>V0.11</strong>，开始与客户沟通。后续每次保存版本自动 +0.01。
+      </p>
+      <el-form>
+        <el-form-item label="沟通说明">
+          <el-input v-model="markNote" type="textarea" :rows="3" placeholder="请描述本次沟通或更改内容..." />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showMarkDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmMarkVersion" :loading="markingVersion">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 更改原因对话框（版本已标记后每次保存需要） -->
+    <el-dialog v-model="showChangeNoteDialog" title="更改原因" width="420px" :close-on-click-modal="false" :show-close="false">
+      <p style="margin-bottom:12px;color:#666">版本已标记用于客户沟通，请说明本次更改原因：</p>
+      <el-input v-model="changeNote" type="textarea" :rows="3" placeholder="请描述更改原因..." />
+      <template #footer>
+        <el-button type="primary" @click="confirmChangeNote" :disabled="!changeNote.trim()">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -334,7 +412,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail } from '../../api/processSheet'
+import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion } from '../../api/processSheet'
+import { getContractLogs } from '../../api/production'
 import { listSpecs } from '../../api/spec'
 import { listBasicData, getColorMapping } from '../../api/basicData'
 import { uploadImages } from '../../api/upload'
@@ -346,6 +425,8 @@ const packagingTypes = ref([])
 const colorMapping = ref({})
 const loading = ref(false)
 const savingDetail = ref(false)
+const contractLogs = ref([])
+const logsLoading = ref(false)
 
 // Items and detail data (reactive copies for editing)
 const items = ref([])
@@ -358,6 +439,34 @@ const patternUploadRefs = reactive({})
 const embossUploadRef = ref(null)
 const accRefs = reactive({})
 const subRefs = reactive({})
+
+// Version management
+const showMarkDialog = ref(false)
+const markNote = ref('')
+const markingVersion = ref(false)
+const showChangeNoteDialog = ref(false)
+const changeNote = ref('')
+let changeNoteResolve = null
+
+function askChangeNote() {
+  return new Promise((resolve) => {
+    changeNoteResolve = resolve
+    changeNote.value = ''
+    showChangeNoteDialog.value = true
+  })
+}
+
+function confirmChangeNote() {
+  if (changeNoteResolve) changeNoteResolve(changeNote.value)
+  showChangeNoteDialog.value = false
+  changeNoteResolve = null
+}
+
+function formatVersion(v) {
+  if (v === null || v === undefined || Number(v) === 0) return ''
+  const num = Number(v)
+  return num % 1 === 0 ? `V${num}` : `V${num.toFixed(2)}`
+}
 
 const accessoryGroups = [
   { key: 2, label: '包贴彩卡' },
@@ -406,6 +515,15 @@ const specWeightText = computed(() => {
   return spec ? spec.weight : '—'
 })
 
+const snapshotContractVersion = computed(() => {
+  if (!sheet.value?.contract_snapshot) return 0
+  const snap = typeof sheet.value.contract_snapshot === 'string'
+    ? JSON.parse(sheet.value.contract_snapshot)
+    : sheet.value.contract_snapshot
+  return snap.latest_confirm_version || 0
+})
+
+
 const accessories = computed(() => {
   if (!detailData) return []
   const result = []
@@ -416,10 +534,6 @@ const accessories = computed(() => {
   }
   return result
 })
-
-function formatPrice(v) {
-  return v ? parseFloat(v).toFixed(2) : '0.00'
-}
 
 function getSpecName(specId) {
   const spec = specs.value.find(s => s.id === specId)
@@ -596,24 +710,74 @@ function removeItem(index) {
   items.value.splice(index, 1)
 }
 
+function saveItemDetail() {
+  const item = activeItem.value
+  if (!item) return
+
+  // Validate packaging type
+  if (!item.packaging_type) {
+    ElMessage.warning('请选择包装方式')
+    return
+  }
+
+  // Validate binding fields (required unless 打卷面料)
+  if (item.packaging_type !== '打卷面料') {
+    if (!detailData.binding_material?.trim()) {
+      ElMessage.warning('请填写包边材料')
+      return
+    }
+    if (!detailData.binding_width?.trim()) {
+      ElMessage.warning('请填写包边宽度')
+      return
+    }
+    if (!item.pattern_count || item.pattern_count <= 0) {
+      ElMessage.warning('请设置花型个数')
+      return
+    }
+  }
+
+  // Validate pattern rows
+  if (item.pattern_data?.length > 0) {
+    for (let i = 0; i < item.pattern_data.length; i++) {
+      const p = item.pattern_data[i]
+      if (!p.code?.trim()) {
+        ElMessage.warning(`第 ${i + 1} 个花型代码不能为空`)
+        return
+      }
+      if (!p.color) {
+        ElMessage.warning(`第 ${i + 1} 个花型颜色不能为空`)
+        return
+      }
+      if (!p.qty || p.qty <= 0) {
+        ElMessage.warning(`第 ${i + 1} 个花型数量必须大于 0`)
+        return
+      }
+    }
+  }
+
+  ElMessage.success('保存成功')
+  showDetailDialog.value = false
+}
+
 // --- Sheet operations ---
+async function confirmMarkVersion() {
+  markingVersion.value = true
+  try {
+    const res = await markVersion(route.params.id, { note: markNote.value })
+    const v = formatVersion(res.data.confirm_version_no)
+    if (v) {
+      ElMessage.success(`已生成版本 ${v}，开始客户沟通`)
+    } else {
+      ElMessage.success('已标记客户沟通')
+    }
+    showMarkDialog.value = false
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+  finally { markingVersion.value = false }
+}
+
 async function handleConfirm() {
-  try {
-    await confirmSheet(route.params.id)
-    ElMessage.success('已确认')
-    loadData()
-  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
-}
-
-async function handleDispatch() {
-  try {
-    await dispatchSheet(route.params.id)
-    ElMessage.success('已下发')
-    loadData()
-  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
-}
-
-async function handleSaveDetail() {
+  // First save the current detail data, then confirm
   savingDetail.value = true
   try {
     const payload = {
@@ -639,6 +803,57 @@ async function handleSaveDetail() {
       })),
     }
     await updateSheetDetail(route.params.id, payload)
+
+    // Then confirm
+    const res = await confirmSheet(route.params.id)
+    ElMessage.success(`客户已确认，正式版本 ${formatVersion(res.data.confirm_version_no)}`)
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+  finally { savingDetail.value = false }
+}
+
+async function handleDispatch() {
+  try {
+    await dispatchSheet(route.params.id)
+    ElMessage.success('已下发')
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+}
+
+async function handleSaveDetail() {
+  // If version is marked, ask for change reason first
+  let note = ''
+  if (sheet.value?.version_marked) {
+    note = await askChangeNote()
+    if (!note?.trim()) return
+  }
+
+  savingDetail.value = true
+  try {
+    const payload = {
+      detail_data: { ...detailData },
+      items: items.value.map(item => ({
+        id: item.id,
+        is_pressed: item.is_pressed,
+        packaging_type: item.packaging_type || '',
+        delivery_date: item.delivery_date,
+        pattern_count: item.pattern_count || 0,
+        pattern_data: item.pattern_data || [],
+        pattern_code: item.pattern_code || '',
+        color_a: item.color_a || '',
+        image_a_1: item.image_a_1 || '',
+        image_a_2: item.image_a_2 || '',
+        image_a_3: item.image_a_3 || '',
+        color_b: item.color_b || '',
+        image_b_1: item.image_b_1 || '',
+        image_b_2: item.image_b_2 || '',
+        image_b_3: item.image_b_3 || '',
+        pressed_image: item.pressed_image || '',
+        remark: item.remark || '',
+      })),
+      change_note: note || undefined,
+    }
+    await updateSheetDetail(route.params.id, payload)
     ElMessage.success('工艺详情已保存')
     loadData()
   } catch (e) {
@@ -646,6 +861,20 @@ async function handleSaveDetail() {
   } finally {
     savingDetail.value = false
   }
+}
+
+async function loadLogs() {
+  if (!sheet.value?.contract?.id) return
+  if (!sheet.value?.items?.length) return
+  logsLoading.value = true
+  try {
+    const itemIds = sheet.value.items.map(item => item.contract_item_id).filter(Boolean)
+    const lRes = await getContractLogs(sheet.value.contract.id)
+    contractLogs.value = (lRes.data || []).filter(log =>
+      !log.contract_item_id || itemIds.includes(log.contract_item_id)
+    )
+  } catch { /* ignore */ }
+  finally { logsLoading.value = false }
 }
 
 async function loadData() {
@@ -705,6 +934,7 @@ async function loadData() {
       box_note_3: dd.box_note_3 || '',
       emboss_model: dd.emboss_model || '',
     })
+    loadLogs()
   } catch { ElMessage.error('加载失败') }
   finally { loading.value = false }
 }

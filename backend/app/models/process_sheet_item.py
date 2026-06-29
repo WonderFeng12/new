@@ -29,6 +29,8 @@ class ProcessSheetItem(Base):
     image_b_3 = Column(String(500))
     pressed_image = Column(String(500))
     remark = Column(Text)
+    process_remark = Column(Text, comment="工艺备注（下推时填写）")
+    qty = Column(DECIMAL(12, 2), default=0, comment="数量（从合同行项目带入）")
 
     process_sheet = relationship("ProcessSheet", back_populates="items")
     contract_item = relationship("ContractItem")

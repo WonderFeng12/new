@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.database import get_db
 from app.schemas.contract import ContractCreate, ContractUpdate, ContractOut
 from app.services import contract as service
+from app.services.notify import notify_contract_ready_for_confirm
 from app.dependencies import get_current_user
 from app.models.user import User
 
@@ -80,7 +81,7 @@ def update(
 ):
     if current_user.role == "生产专员":
         raise HTTPException(status_code=403, detail="权限不足")
-    result = service.update_contract(db, id, data, current_user.display_name or current_user.username)
+    result = service.update_contract(db, id, data, current_user.display_name or current_user.username, current_user.role)
     if not result:
         raise HTTPException(status_code=404, detail="合同不存在")
     return result
@@ -114,3 +115,46 @@ def manual_confirm(
     if not result:
         raise HTTPException(status_code=404, detail="合同不存在")
     return result
+
+
+@router.post("/{id}/request-confirm")
+def request_confirm(
+    id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务员完成合同后，发送企微通知请求销售经理确认。"""
+    c = service.get_contract(db, id)
+    if not c:
+        raise HTTPException(status_code=404, detail="合同不存在")
+    if c.status != "草稿":
+        raise HTTPException(status_code=400, detail="仅草稿合同可请求确认")
+    from datetime import datetime as dt
+    service.update_confirm_request_time(db, id, dt.now())
+    # Use configured system URL, fall back to request base
+    from app.models.system_config import SystemConfig
+    sys_url_config = db.query(SystemConfig).filter(
+        SystemConfig.config_key == "system_base_url"
+    ).first()
+    base_url = sys_url_config.config_value if sys_url_config else str(request.base_url).rstrip("/")
+    notify_contract_ready_for_confirm(
+        db, c.contract_no,
+        current_user.display_name or current_user.username,
+        base_url=base_url,
+        contract_id=id,
+    )
+    return {"message": "已发送确认请求，明天8点将自动催办"}
+
+
+@router.post("/{id}/reopen-edit")
+def reopen_edit(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """重新打开已确认/已下发的合同进行编辑（记录日志）。"""
+    if current_user.role == "生产专员":
+        raise HTTPException(status_code=403, detail="权限不足")
+    service.reopen_edit(db, id, current_user.id)
+    return {"message": "已记录重新编辑操作"}

@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-嘉元瑞通工厂订单管理系统，分三期实施。第1期为 Web 端订单录入系统，已实现从订单录入→客户确认→合同生成→工艺单下发的完整闭环。
+嘉元瑞通工厂订单管理系统，分三期实施。第1期为 Web 端订单录入系统，已实现从订单录入→客户确认→合同生成→工艺单下发→生产推进的完整闭环。
 
 - **第1期（已完成）**：Web 页面订单录入系统（含公开确认链接）
 - **第2期（规划中）**：微信小程序 — 客户自主选花型、下单
@@ -21,6 +21,7 @@
 | 图片处理 | Pillow（自动压缩） |
 | PDF 生成 | WeasyPrint（可选依赖） |
 | 认证 | JWT (python-jose) + bcrypt |
+| 通知 | 企业微信群机器人 Webhook |
 | 部署 | Docker + docker-compose |
 
 ## 项目结构
@@ -42,6 +43,7 @@
 │   ├── main.py                # 启动入口
 │   ├── init_db.py             # 建表脚本
 │   ├── seed.py                # 测试数据
+│   ├── migrate_*.py           # 数据库迁移脚本
 │   ├── uploads/               # 上传文件存储（gitignored）
 │   └── app/
 │       ├── main.py            # FastAPI 入口，注册路由
@@ -57,6 +59,12 @@
 │       │   ├── contract_item.py
 │       │   ├── confirm_image.py
 │       │   ├── process_sheet.py
+│       │   ├── process_sheet_item.py
+│       │   ├── process_step.py         # 工序主数据
+│       │   ├── process_step_assignee.py # 工序负责人配置
+│       │   ├── production_log.py       # 生产状态变更日志
+│       │   ├── webhook_config.py       # 企微群机器人配置
+│       │   ├── system_config.py        # 系统配置
 │       │   └── basic_data.py  # 基础数据（颜色映射、包装方式等）
 │       ├── schemas/           # Pydantic 校验/序列化
 │       │   ├── user.py
@@ -66,6 +74,10 @@
 │       │   ├── contract_item.py
 │       │   ├── confirm_image.py
 │       │   ├── process_sheet.py
+│       │   ├── process_step.py
+│       │   ├── production_log.py
+│       │   ├── webhook_config.py
+│       │   ├── system_config.py
 │       │   └── basic_data.py
 │       ├── services/          # 业务逻辑层
 │       │   ├── auth.py        # 认证、JWT 生成/验证
@@ -74,6 +86,10 @@
 │       │   ├── contract.py    # 合同 CRUD + 金额计算 + 权限过滤
 │       │   ├── confirm_image.py # 确认图版本控制
 │       │   ├── process_sheet.py # 工艺单 CRUD + 下推 + 版本校验
+│       │   ├── process_step.py  # 工序 CRUD + 负责人配置
+│       │   ├── production.py    # 生产流程：推进/回退/返工/取消/坯布计划
+│       │   ├── notify.py        # 企微通知发送
+│       │   ├── reminder.py      # 定时催办
 │       │   └── basic_data.py    # 基础数据 CRUD + 颜色映射查询
 │       ├── api/               # 路由层
 │       │   ├── auth.py
@@ -81,49 +97,46 @@
 │       │   ├── specs.py
 │       │   ├── contracts.py
 │       │   ├── process_sheets.py
+│       │   ├── production.py   # 生产流程 + 工序管理 + 设置
+│       │   ├── users.py        # 用户管理 CRUD
+│       │   ├── webhook_config.py # 企微webhook配置
 │       │   ├── upload.py
-│       │   ├── basic_data.py  # 基础数据 CRUD
-│       │   └── public.py     # 公开端点（客户确认链接，无需登录）
+│       │   ├── basic_data.py
+│       │   └── public.py       # 公开端点（无需登录）
 │       └── utils/
-│           ├── image_compress.py # Pillow 图片压缩
-│           └── pdf_generator.py  # WeasyPrint PDF 生成
+│           ├── image_compress.py
+│           └── pdf_generator.py
 ├── frontend/
-│   ├── Dockerfile             # 多阶段构建（node build → nginx serve）
-│   ├── nginx.conf             # 反向代理 /api/ → backend
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   └── src/
-│       ├── main.js            # Vue 入口，注册 ElementPlus/Pinia/Router
-│       ├── App.vue            # 主布局（侧边栏 + 路由视图）
-│       ├── api/               # API 调用封装
-│       │   ├── index.js       # axios 实例（拦截器、Bearer Token）
+│       ├── main.js
+│       ├── App.vue
+│       ├── api/
+│       │   ├── index.js
 │       │   ├── auth.js
 │       │   ├── customer.js
 │       │   ├── spec.js
 │       │   ├── contract.js
 │       │   ├── upload.js
-│       │   └── processSheet.js
-│       │   └── basicData.js
+│       │   ├── processSheet.js
+│       │   ├── basicData.js
+│       │   └── production.js
 │       ├── store/
-│       │   └── user.js        # Pinia store（token、user、role）
+│       │   └── user.js
 │       ├── router/
-│       │   └── index.js       # 路由配置 + 守卫
+│       │   └── index.js
 │       ├── components/
-│       │   └── ImageUploader.vue # 多文件上传 + 压缩率显示
+│       │   └── ImageUploader.vue
 │       └── views/
 │           ├── login/Login.vue
 │           ├── dashboard/Dashboard.vue
 │           ├── customer/CustomerList.vue
 │           ├── spec/SpecList.vue
-│           ├── contract/
-│           │   ├── ContractList.vue
-│           │   ├── ContractForm.vue
-│           │   └── ContractDetail.vue
-│           └── processSheet/
-│               ├── SheetList.vue
-│               └── SheetDetail.vue
-│           ├── basicData/
-│           │   └── BasicDataList.vue
-│           └── public/
-│               └── ConfirmPage.vue  # 客户公开确认页面（无需登录）
+│           ├── contract/ (ContractList, ContractForm, ContractDetail)
+│           ├── processSheet/ (SheetList, SheetDetail)
+│           ├── basicData/BasicDataList.vue
+│           └── public/ConfirmPage.vue
 ```
 
 ## 数据库模型
@@ -135,9 +148,10 @@
 | username | VARCHAR(100) UNIQUE | 登录名 |
 | password_hash | VARCHAR(200) | bcrypt 哈希 |
 | display_name | VARCHAR(100) | 显示名 |
-| role | ENUM('业务员','销售经理','生产专员') | 角色 |
+| role | ENUM('业务员','销售经理','生产专员','外协人员') | 角色 |
 | is_active | BOOLEAN | 是否启用 |
 | is_deleted | BOOLEAN | 软删除 |
+| wecom_userid | VARCHAR(100) | 企微用户ID（用于 @提及通知）|
 
 ### 客户 (customer) — 含 TimestampMixin + SoftDeleteMixin + AuditMixin
 | 字段 | 类型 | 说明 |
@@ -151,52 +165,54 @@
 ### 规格 (spec) — 含 AuditMixin
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| length | VARCHAR(50) | 毛毯尺寸-长，如 200（必须是数字） |
-| width | VARCHAR(50) | 毛毯尺寸-宽，如 240（必须是数字） |
-| weight | VARCHAR(50) | 毛毯重量，存储如 4KG（输入纯数字，系统自动追加 KG）|
+| length | VARCHAR(50) | 毛毯尺寸-长（必须是数字）|
+| width | VARCHAR(50) | 毛毯尺寸-宽（必须是数字）|
+| weight | VARCHAR(50) | 存储如 4KG（输入纯数字，系统自动追加 KG）|
 | layer_type | ENUM('单层','双层','复合') | 单双层 |
-| spec_name | VARCHAR(200) | 自动生成：`长*宽/重量/层类型` 如 `200*240/4KG/单层` |
+| spec_name | VARCHAR(200) | 自动生成：`长*宽/重量/层类型` |
 | spec_description | TEXT | 自动生成，同 spec_name |
 
 ### 基础数据 (basic_data) — 含 TimestampMixin
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | INT PK | |
-| category | VARCHAR(50) | 分类：color_mapping（颜色映射）、packaging_type（包装方式）|
-| code | VARCHAR(100) | 代码/键（颜色名称或包装方式名称）|
-| value | VARCHAR(200) | 值（如包边色号）|
+| category | VARCHAR(50) | 分类：color_mapping/packaging_type/code_rules |
+| code | VARCHAR(100) | 代码/键 |
+| value | VARCHAR(200) | 值 |
 | sort_order | INT | 排序号 |
 
 ### 合同 (contract) — 含 TimestampMixin + SoftDeleteMixin + AuditMixin
-包含字段：contract_no, customer_id(FK), contract_date, spec_id(FK, nullable — 遗留字段，已废弃), delivery_date, binding_material/width/color_no, tech_note_1~10(TEXT), accessory_desc/size/qty_1~6, pack_note_1~5, box_note_1~3, emboss_model, total_amount(DECIMAL 12,2)
+包含字段：contract_no, customer_id(FK), contract_date, spec_id(FK 废弃), delivery_date, binding_material/width/color_no, tech_note_1~10(TEXT), accessory_desc/size/qty_1~6, pack_note_1~5, box_note_1~3, emboss_model, total_amount(DECIMAL 12,2)
 
-> 毛毯规格(spec_id)、是否压花(is_pressed)、包装方式(packaging_type) 已移至行项目(contract_item)级别。
+> 毛毯规格、是否压花、包装方式 已移至行项目级别。
 
 状态字段：
-- **status**: ENUM('草稿','保存','已下发')，默认草稿
-- **is_pushed_down**: BOOLEAN 是否已下推工艺单
+- **status**: ENUM('草稿','确认','已下发')，默认草稿
+- **is_pushed_down**: BOOLEAN 是否下推行项目到工艺单
 - **push_down_sheet_id**: INT 关联工艺单 ID
-- **latest_confirm_version**: INT 最新确认图版本号
-- **confirm_token**: VARCHAR(36) UNIQUE NULL — UUID 公开确认链接令牌
-- **customer_comment**: TEXT NULL — 客户通过公开确认链接提交的意见
+- **latest_confirm_version**: INT 版本号：确认后=V1，重新编辑递增
+- **confirm_requested_at**: DATETIME 请求确认时间
+- **last_reminded_at**: DATETIME 催办提醒时间
 
 ### 合同行项目 (contract_item)
 | 字段 | 说明 |
 |------|------|
 | line_no | 行号 |
-| spec_id(FK) | 关联毛毯规格主数据 |
+| spec_id(FK) | 关联规格 |
 | is_pressed | 是否压花 |
 | packaging_type | 包装方式（纸箱/抽真空/压缩包/打卷面料）|
-| delivery_date | 交期（行级别）|
+| delivery_date | 交期 |
 | pattern_count | 花型数量 |
-| pattern_data(JSON) | 花型详细数据，每项含 code/color/binding_color_no/image/qty 字段 |
-| unit_price / qty / amount | 价格信息（amount = unit_price × qty）|
+| pattern_data(JSON) | 花型详细数据 |
+| unit_price / qty / amount | 价格信息 |
 | pattern_code | 花型编号 |
 | color_a / color_b | A/B 面颜色 |
-| image_a_1~3 / image_b_1~3 | A/B 面图片路径（最多各3张）|
+| image_a_1~3 / image_b_1~3 | A/B 面图片 |
 | remark | 备注 |
-
-> 工艺备注(tech_note_1~10)、辅料包边(accessory_desc/size/qty_1~6、binding_*)、包装箱单(pack_note_1~5、box_note_1~3) 在合同级别定义，行项目明细弹窗中引用。
+| **production_status** | VARCHAR(30) 生产状态（工序编码）|
+| **yarn_plan_user_id**(FK) | 坯布负责人（外协人员）|
+| **yarn_plan_no** | 坯布计划单号 |
+| **cancel_reason** | TEXT 取消原因 |
+| **cancel_quantities** | JSON 取消数量 |
 
 ### 确认图版本 (confirm_image)
 | 字段 | 说明 |
@@ -213,205 +229,273 @@
 | 字段 | 说明 |
 |------|------|
 | contract_id(FK) | 关联合同 |
-| sheet_no | 工艺单号，系统生成 "GY2026060001" |
-| confirm_version_no | 基于合同的确认图版本号 |
-| confirm_image_id(FK) | 关联确认图版本记录 |
-| status | ENUM('草稿','保存','已下发') |
+| sheet_no | 工艺单号 `月-序号` 或 `YYYYMM-序号` |
+| confirm_version_no | DECIMAL：下推时取合同最新版本号 |
+| status | ENUM('草稿','保存','已下发','已确认','修改中') |
+| version_marked | BOOLEAN 是否标记客户沟通 |
+| version_note | TEXT 版本标记说明 |
+| confirm_token | VARCHAR(36) UUID 公开确认链接令牌 |
+| customer_comment | TEXT 客户意见 |
+| detail_data | JSON 生产详情 |
+| contract_snapshot | JSON 下推时合同快照 |
+| contract_snapshot_item | JSON 行项目快照 |
 
-> 工艺单的详细内容（客户、规格、包边、行项目等）从关联合同读取。
+### 工艺单行项目 (process_sheet_item)
+| 字段 | 说明 |
+|------|------|
+| process_sheet_id(FK) | 关联工艺单 |
+| contract_item_id(FK) | 关联合同行项目 |
+| line_no | 行号 |
+| spec_id(FK) | 规格 |
+| packaging_type | 包装方式 |
+| is_pressed | 是否压花 |
+| delivery_date | 交期 |
+| pattern_count | 花型数量 |
+| pattern_data(JSON) | 花型数据 |
+| pattern_code | 花型编号 |
+| color_a / color_b | 颜色 |
+| image_a_1~3 / image_b_1~3 | 图片 |
+| qty | 数量 |
+| process_remark | 工艺备注 |
+| remark | 备注 |
+
+### 工序 (process_step)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| step_code | VARCHAR(30) UNIQUE | 工序编码，如 yarn_plan/weaving |
+| step_name | VARCHAR(50) | 工序名称 |
+| sort_order | INT | 排序 |
+| is_active | BOOLEAN | 是否启用 |
+
+### 工序负责人 (process_step_assignee)
+| 字段 | 说明 |
+|------|------|
+| process_step_id(FK) | 关联工序 |
+| user_id(FK) | 关联用户 |
+| UNIQUE(process_step_id, user_id) | 唯一约束 |
+
+### 生产日志 (production_log)
+| 字段 | 说明 |
+|------|------|
+| contract_id(FK) | 关联合同 |
+| contract_item_id(FK) | 关联行项目 |
+| from_status / to_status | 状态变更 |
+| operation_type | ENUM('推进','回退','返工','取消','确认','坯布下达','重新编辑') |
+| operator_id(FK) | 操作人 |
+| remark | 备注 |
+| notify_status | VARCHAR(20) 通知状态 |
+
+### Webhook 配置 (webhook_config)
+| 字段 | 说明 |
+|------|------|
+| name | VARCHAR(100) UNIQUE webhook名称 |
+| webhook_url | TEXT 企微群机器人URL |
+| is_enabled | BOOLEAN 是否启用 |
+
+### 系统配置 (system_config)
+| 字段 | 说明 |
+|------|------|
+| config_key | VARCHAR(100) UNIQUE 配置键 |
+| config_value | TEXT 配置值 |
 
 ## 状态机
 
 ### 合同
 ```
-草稿 → (客户确认) → 保存 → (下推工艺单) → 已下发
+草稿 → (销售经理确认) → 确认 → (下推行项目工艺单) → 已下发
 ```
-- **草稿**: 可编辑、可生成确认图、可软删除
-- **保存**: 客户已确认、不可编辑、可下推工艺单
-- **已下发**: 工艺单已下发、不可删除
+- **草稿**: 可编辑、可生成确认图、可删除
+- **确认**: 已确认、可下推行项目到工艺单
+- **已下发**: 有行项目已下推工艺单
+
+### 合同行项目生产状态（工序驱动）
+```
+↓ 坯布计划下达
+yarn_plan → weaving → weaving_done → setting → setting_done
+→ brushing → brushing_done → printing → printing_done
+→ sewing → completed
+```
+- 每步推进需操作人是下一工序负责人
+- 回退/返工仅销售经理/生产专员可操作
+- 可在任意工序取消（cancelled）
 
 ### 工艺单
 ```
-草稿 → (确认) → 保存 → (下发) → 已下发
+纯草稿(V0) → (客户沟通) → V0.11 → (修改) → V0.12 → ...
+→ (客户确认) → 保存(V1) → (下发) → 已下发
+                                → (再沟通) → 沟通中(V2...)
 ```
-- **草稿**: 可编辑、可删除
-- **保存**: 不可编辑、可下发
-- **已下发**: 发至车间、不可删除
+- 纯草稿版本 = 0，可随意修改
+- 客户沟通后每次保存版本 +0.01
+- 确认后进位到整数 V1/V2...
 
 ## 业务规则
 
 | ID | 规则 | 实现位置 |
 |----|------|---------|
-| B001 | 合同录入时，规格不存在则自动创建并提示 | contract service |
-| B002 | 合同草稿可修改、可反复生成确认图 | contract service |
-| B003 | 确认图版本号每次+1，含时间戳和修改日志 | confirm_image service |
-| B004 | 客户确认后合同变为「保存」 | confirm_image service → mark_confirmed |
-| B005 | 合同保存后才可下推工艺单 | process_sheet service |
-| B006 | 一个合同只能下推一次 | process_sheet service (is_pushed_down 检查) |
+| B001-B003 | 规格/确认图/合同草稿操作 | 各 service |
+| B004 | 合同确认：销售经理手动确认（带意见），或管理员确认 | contract service → manual_confirm_contract |
+| B005 | 合同确认后可下推行项目到工艺单 | production service |
+| B006 | 一个合同行项目只能下推一次工艺单 | production service (ProcessSheetItem 检查) |
 | B007 | 工艺单下发前校验合同版本是否为最新 | process_sheet service → dispatch |
 | B008 | 工艺单下发 → 合同自动变为「已下发」 | process_sheet service |
 | B009 | 所有表软删除，已下发数据不可删除 | 各 service |
 | B010 | 上传图片强制压缩（1920px, 85% quality） | image_compress utils |
 | B011 | 业务员只能查看/编辑自己创建的合同 | contract service |
 | B012 | 金额=单价×数量，合同总金额=∑行项目金额 | contract service |
-| B013 | 规格被合同或合同行项目引用后不可编辑、不可删除（is_in_use） | spec service（检查 ContractItem.spec_id + Contract.spec_id） |
-| B014 | 客户被合同引用后不可编辑、不可删除（is_in_use） | customer service |
-| B015 | 重量字段输入纯数字（可含小数），系统自动追加 KG | spec service |
-| B016 | 毛毯尺寸长/宽必须是数字 | spec service |
-| B017 | 行项目工艺单说明自动生成：`规格名称+经编印花+压花/空+毛毯-包装方式` | ContractForm.vue（前端 computed） |
-| B018 | 花型数量自动分配：总数÷花型个数取整，余数归第一个花型 | ContractForm.vue（前端 distributeQty） |
-| B019 | 花型用量(m) = 花型数量 × 10.56，数量为0时显示空白 | ContractForm.vue（前端 template） |
-| B020 | 技术要求说明1 自动生成格式：`1.请注意尺寸和重量控制 长*宽/重量 正负{公差}`，数据从首行规格读取 | ContractForm.vue（前端 computed + watcher） |
-| B021 | 公开确认链接生成 UUID 令牌，客户无需登录即可查看合同并提交确认意见 | contract service + public API |
-| B022 | 客户通过公开链接确认后，customer_comment 记录意见，合同变更为「保存」，生成确认图版本 | public.py → confirm_image service |
+| B013-B016 | 规格/客户/字段校验 | spec/customer service |
+| B017-B020 | 前端自动生成说明 | ContractForm.vue |
+| B021-B022 | 公开确认链接 | contract service + public API |
+| B023-B024 | 工艺单版本号规则 | process_sheet service |
+| B025 | 工艺单 confirm_version_no 下推时取合同 latest_confirm_version | production service |
+| B026 | 行项目级别排产：坯布计划下达后 production_status=yarn_plan | production service |
+| B027 | 生产推进校验工序负责人权限 | production service |
+| B028 | 删除工艺单时硬删除 ProcessSheetItem、重置合同行项目下推状态 | process_sheet service |
+| B029 | 坯布计划可指定外协人员 | production service → release_yarn_plan |
 
 ## API 端点
 
-### 认证 `/api/auth`
-- `POST /login` — 登录获取 JWT
-- `POST /register` — 注册新用户
-- `GET /me` — 获取当前用户信息
+### 认证 `/api/auth` — POST /login, POST /register, GET /me
 
-### 客户 `/api/customers`
-- `GET /api/customers?keyword=` — 客户列表（返回 is_in_use 标记，支持排序）
-- `GET /api/customers/{id}` — 客户详情
-- `POST /api/customers` — 新建客户
-- `PUT /api/customers/{id}` — 更新客户（被合同引用时拒绝）
-- `DELETE /api/customers/{id}` — 删除客户（被合同引用时拒绝）
+### 客户 `/api/customers` — CRUD + keyword 搜索 + is_in_use 标记
 
-### 规格 `/api/specs`
-- `GET /api/specs?keyword=` — 规格列表（返回 is_in_use 标记）
-- `GET /api/specs/{id}` — 规格详情
-- `POST /api/specs` — 新建规格（weight 传纯数字，系统自动加 KG）
-- `PUT /api/specs/{id}` — 更新规格（被引用时拒绝）
-- `DELETE /api/specs/{id}` — 删除规格
-- `POST /api/specs/{id}/clone` — 复制规格
+### 规格 `/api/specs` — CRUD + keyword 搜索 + clone
 
 ### 合同 `/api/contracts`
-- `GET /api/contracts?keyword=&status=` — 合同列表（权限过滤）
-- `GET /api/contracts/available` — 可下推的合同列表
-- `GET /api/contracts/{id}` — 合同详情
-- `POST /api/contracts` — 新建合同
-- `PUT /api/contracts/{id}` — 更新合同（仅草稿）
-- `DELETE /api/contracts/{id}` — 删除合同（仅草稿）
-- `POST /api/contracts/{id}/confirm-image` — 生成确认图
-- `POST /api/contracts/{id}/confirm` — 标记客户确认
-- `GET /api/contracts/{id}/versions` — 确认图版本历史
-- `POST /api/contracts/{id}/generate-confirm-link` — 生成公开确认链接（UUID 令牌）
-
-### 基础数据 `/api/basic-data`
-- `GET /api/basic-data/{category}` — 按分类列出基础数据项
-- `POST /api/basic-data/{category}` — 新建基础数据项
-- `PUT /api/basic-data/{category}/{id}` — 更新基础数据项
-- `DELETE /api/basic-data/{category}/{id}` — 删除基础数据项
-- `GET /api/basic-data/mapping/color` — 获取颜色→包边色号映射字典
-
-### 图片上传 `/api/upload`
-- `POST /api/upload/images` — 上传图片（多文件、自动压缩）
-
-### 公开接口 `/api/public`（无需 JWT 认证）
-- `GET /api/public/contract/{token}` — 通过令牌获取合同详情（含行项目、花型图片），返回 `already_confirmed` 标记
-- `POST /api/public/confirm/{token}` — 客户通过链接提交确认意见，状态变为「保存」，记录 customer_comment
+- `GET /contracts` — 列表（权限过滤）
+- `GET /contracts/available` — 可下推的合同列表
+- `GET /contracts/{id}` — 详情
+- `POST /contracts` — 新建
+- `PUT /contracts/{id}` — 更新（草稿/可编辑）
+- `DELETE /contracts/{id}` — 删除（仅草稿）
+- `POST /contracts/{id}/confirm-image` — 生成确认图
+- `POST /contracts/{id}/manual-confirm` — 销售经理手动确认（带意见）
+- `POST /contracts/{id}/request-confirm` — 业务员请求确认（企微通知）
+- `POST /contracts/{id}/reopen-edit` — 重新打开编辑（递增版本号）
+- `POST /contracts/{id}/generate-confirm-link` — 生成确认链接
+- `GET /contracts/{id}/versions` — 确认图版本历史
+- `GET /contracts/{id}/production-logs` — 生产日志
 
 ### 工艺单 `/api/process-sheets`
-- `GET /api/process-sheets?keyword=` — 工艺单列表
-- `GET /api/process-sheets/{id}` — 工艺单详情
-- `POST /api/process-sheets` — 新建工艺单（选择未下推合同）
-- `POST /api/process-sheets/push-down/{contract_id}` — 从合同下推
-- `PUT /api/process-sheets/{id}/confirm` — 工艺单确认（草稿→保存）
-- `POST /api/process-sheets/{id}/dispatch` — 工艺单下发
-- `GET /api/process-sheets/{id}/print` — 打印 PDF
-- `DELETE /api/process-sheets/{id}` — 删除工艺单
+- CRUD + push-down + detail + mark-version + confirm + dispatch + print
+
+### 生产流程 `/api` (production router)
+- `GET /process-steps` — 工序列表
+- `POST /process-steps` — 创建工序
+- `PUT /process-steps/{id}` — 更新工序
+- `DELETE /process-steps/{id}` — 删除工序
+- `PUT /process-steps/{id}/assignees` — 设置工序负责人
+- `POST /contract-items/{id}/advance` — 推进到下一工序
+- `POST /contract-items/{id}/rollback` — 回退一工序
+- `POST /contract-items/{id}/rework` — 返工到指定工序
+- `POST /contract-items/{id}/cancel` — 取消行项目
+- `POST /contract-items/{id}/yarn-plan` — 下达坯布计划
+- `POST /contract-items/{id}/push-down` — 下推工艺单
+- `GET /contract-items/{id}/logs` — 行项目生产日志
+- `GET /my-tasks` — 我的任务（外协人员）
+- `GET /settings/wecom` — 企微设置
+- `PUT /settings/wecom` — 更新企微设置
+- `PUT /users/me/wecom` — 更新本人企微ID
+
+### 基础数据 `/api/basic-data` — CRUD
+
+### 图片上传 `/api/upload` — POST /images
+
+### 公开接口 `/api/public` — GET /contract/{token}, POST /confirm/{token}
+
+### 用户管理 `/api/users` — CRUD（仅销售经理）
+### Webhook配置 `/api/webhook-configs` — CRUD（仅销售经理）
 
 ## 角色权限
 
-| 功能 | 业务员 | 销售经理 | 生产专员 |
-|------|--------|---------|---------|
-| 客户/规格增删改查 | 全部 | 全部 | 全部 |
-| 新建/查看合同 | 仅自己 | 全部 | **不可见**（403） |
-| 编辑合同 | 仅自己的草稿 | 全部草稿 | 不可 |
-| 生成确认图 | 可 | 可 | 不可 |
-| 标记确认 | 可 | 可 | 不可 |
-| 删除合同 | 仅草稿+自己的 | 仅草稿 | 不可 |
-| 下推工艺单 | 不可 | 可 | 可 |
-| 查看工艺单 | 仅关联 | 全部 | 全部 |
-| 编辑/删除工艺单（草稿） | 不可 | 可 | 可 |
-| 下发工艺单 | 不可 | 可 | 可 |
+| 功能 | 业务员 | 销售经理 | 生产专员 | 外协人员 |
+|------|--------|---------|---------|---------|
+| 客户/规格 CRUD | 全部 | 全部 | 全部 | 全部 |
+| 合同 CRUD | 仅自己 | 全部 | **403** | **403** |
+| 编辑合同 | 仅自己草稿 | 全部草稿 | 不可 | 不可 |
+| 手动确认合同 | 不可 | 可 | 不可 | 不可 |
+| 请求确认合同 | 可 | - | - | - |
+| 重新打开编辑 | 不可 | 可 | 可 | 不可 |
+| 下推行项目工艺单 | 不可 | 可 | 可 | 不可 |
+| 推进/回退/返工/取消 | 仅取消自己合同 | 全部 | 全部 | 不可 |
+| 坯布计划下达 | 不可 | 可 | 可 | 不可 |
+| 查看工艺单 | 仅关联 | 全部 | 全部 | 不可 |
+| 编辑/删除工艺单 | 不可 | 可 | 可 | 不可 |
+| 下发工艺单 | 不可 | 可 | 可 | 不可 |
+| 查看我的任务 | - | - | - | 仅自己 |
+| 管理用户 | 不可 | 可 | 不可 | 不可 |
+| 管理 Webhook | 不可 | 可 | 不可 | 不可 |
 
-## 核心工作流
+## 核心工作流（V2）
 
 ### 完整流程
 ```
-1. 创建客户 → 创建规格
-2. 新建合同（填写基本信息、行项目，每行可打开明细弹窗设置花型/颜色/技术要求/辅料包边/包装箱单）
-3. 上传花型图片（自动压缩）
-4. 生成确认图V1（系统自动分配版本号）
-5. 生成公开确认链接（UUID 令牌），发送给客户（微信/邮件）
-6. 客户打开链接查看合同详情、花型图片，提交意见并确认（合同→保存，版本锁定，记录客户意见）
-7. 下推工艺单（合同→已下发，创建工艺单→草稿）
-8. 确认工艺单（工艺单→保存）
-9. 下发工艺单（工艺单→已下发，校验合同版本）
-10. 打印工艺单 PDF
+1. 创建客户 → 创建规格 → 新建合同（含行项目、花型图片）
+2. 业务员填写完成 → 点击「请求确认」→ 企微通知销售经理
+3. 销售经理打开合同详情 → 点击「手动确认」→ 填写确认意见 → 合同→确认(V1)
+4. 在合同详情中，选择行项目 → 点击「下推工艺单」→ 弹出工艺备注弹窗
+5. 系统创建工艺单(草稿,版本=合同版本) → 跳转到工艺单详情页
+6. 编辑工艺单详情 → 点击「客户沟通」→ 版本标记 V0.11
+7. (可选) 生成公开确认链接发给客户确认
+8. 点击「客户确认」→ 版本进位到 V1 → 工艺单→保存
+9. 下发工艺单 → 工艺单→已下发
+10. 在合同详情中，为行项目下达坯布计划 → 指定外协人员
+11. 生产推进：每工序完成由负责人点击推进 → 企微通知下一工序负责人
+12. 遇到问题时：回退/返工（仅销售经理/生产专员）
+13. 需要取消时：填写原因取消行项目（企微通知）
 ```
 
-### 确认图版本控制
+### 合同确认流程
 ```
-草稿 → 生成确认图V1 → (修改合同) → 生成V2 → ... → 客户确认(Vn) → 保存
+业务员完成合同 → 点击[请求确认] → 企微群通知销售经理
+                                      ↓
+                          销售经理打开合同详情
+                                      ↓
+                          点击[手动确认]，填写确认意见
+                                      ↓
+                          合同→确认(latest_confirm_version=V1)
 ```
-- 每次生成版本号+1
-- 每张确认图记录生成时间、操作人、修改日志
-- 标记确认基于最新版本
-- 工艺单生成时记录基于哪个版本
+
+### 行项目下推 vs 旧合同下推
+- **行项目下推（V2新模式）**：在合同详情中，每个行项目有独立「下推工艺单」按钮，一个行项目只能下推一次
+- **旧合同下推（保留兼容）**：`POST /api/process-sheets/push-down/{contract_id}` 整单下推（is_pushed_down 标记）
+- 删除工艺单 → 硬删除 ProcessSheetItem + 重置合同行项目下推状态
+
+### 工序推进流程
+```
+坯布计划下达(yarn_plan) → 织造中 → 织造完成 → 定型中 → 定型完成
+→ 刷毛烫光中 → 刷毛烫光完成 → 印花中 → 印花完成
+→ 成品缝制 → 成品完成(completed)
+```
+- 行项目生产状态由 `production_status` 追踪
+- 步进式推进，每步校验操作人权限
+- 全部工序完成 → 自动发企微通知
 
 ## 图片存储策略
 
 ### 当前方案（第1期）
-- **存储位置**：本地服务器 `backend/uploads/` 目录
-- **处理流程**：上传 → Pillow 强制压缩（最长边 1920px, 85% quality）→ 存入 uploads 目录 → 数据库记录 URL 路径
+- **存储位置**：本地 `backend/uploads/` 目录
+- **处理流程**：上传 → Pillow 强制压缩（最长边 1920px, 85% quality）
 - **前端访问**：Nginx 反向代理 `/uploads/` → `http://backend:8000/uploads/`
-- **适用场景**：工厂内部使用，图片量级不大（合同花型图，年几千张），当前方案足够
 
 ### 未来方案（第2期规划）
-目标：迁移至云对象存储（OSS），解决磁盘空间顾虑，并为微信小程序提供 CDN 加速。
-
-**流程设计：**
-```
-上传 → 计算 SHA256 文件指纹 → 以 hash 为文件名存 OSS → 
-数据库只存 hash 和 URL → 天然去重，同一图片多人上传只存一份
-```
-
-**优势：**
-- **去重存储**：文件指纹（SHA256）作为文件名，相同图片不重复存储
-- **CDN 加速**：微信小程序加载图片更快
-- **无磁盘压力**：按量付费，无需手动清理
-- **迁移时机**：第2期微信小程序上线时实施，当前保持本地存储
+上传 → 计算 SHA256 文件指纹 → 以 hash 为文件名存 OSS → 数据库只存 hash 和 URL → 天然去重
 
 ## 本地开发
 
 ### 后端
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-# WeasyPrint 可选：pip install weasyprint
-
-# 确保 MySQL 运行，创建数据库
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS huazhi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# 初始化数据库并插入测试数据
-python init_db.py
-python seed.py
-
-# 启动（热重载）
+python init_db.py && python seed.py
 uvicorn app.main:app --reload --port 8000
 ```
 
 ### 前端
 ```bash
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
 ```
 
 ### 测试账号
@@ -421,7 +505,7 @@ npm run dev
 | sales | sales123 | 业务员 |
 | producer | prod123 | 生产专员 |
 
-### 数据库配置（backend/app/config.py）
+### 数据库配置
 ```
 DATABASE_URL=mysql+pymysql://root:root@localhost:3306/huazhi?charset=utf8mb4
 COMPRESS_QUALITY=85
@@ -436,9 +520,5 @@ docker-compose up -d
 
 部署架构：
 - **MySQL 8.0**: 端口 3306，持久化卷 mysql_data
-- **Backend**: Python FastAPI 运行在 uvicorn，端口 8000
-- **Frontend**: Nginx 托管 Vue 构建产物，端口 80，反向代理 /api/ 和 /uploads/ 到后端
-
-前端 Nginx 配置代理：
-- `/api/` → `http://backend:8000/api/`
-- `/uploads/` → `http://backend:8000/uploads/`
+- **Backend**: Python FastAPI uvicorn，端口 8000
+- **Frontend**: Nginx 托管 Vue 产物，端口 80，反向代理 /api/ 和 /uploads/ 到后端

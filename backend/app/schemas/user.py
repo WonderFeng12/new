@@ -14,9 +14,21 @@ class UserOut(BaseModel):
     display_name: str
     role: str
     is_active: bool
+    wecom_userid: str | None = None
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    display_name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    wecom_userid: str | None = None
+
+
+class UserPasswordReset(BaseModel):
+    password: str
 
 
 class Token(BaseModel):

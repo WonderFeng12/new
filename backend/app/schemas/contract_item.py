@@ -99,7 +99,12 @@ class ContractItemOut(BaseModel):
     cancel_quantities: Optional[Any] = None
     cancel_reason: Optional[str] = None
     yarn_plan_user_name: Optional[str] = None
+    yarn_plan_no: Optional[str] = None
     has_process_sheet: Optional[bool] = False
+    process_sheet_id: Optional[int] = None
+    process_sheet_no: Optional[str] = None
+    process_sheet_status: Optional[str] = None
+    process_sheet_version: Optional[int] = 0
 
     class Config:
         from_attributes = True

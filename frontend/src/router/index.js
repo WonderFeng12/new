@@ -59,8 +59,7 @@ const routes = [
   },
   {
     path: '/process-steps',
-    component: () => import('../views/processStep/ProcessStepList.vue'),
-    meta: { roles: ['销售经理', '生产专员'] },
+    redirect: '/basic-data',
   },
   {
     path: '/my-tasks',
@@ -70,7 +69,12 @@ const routes = [
   {
     path: '/settings/wecom',
     component: () => import('../views/settings/WeComSettings.vue'),
-    meta: { roles: ['销售经理', '生产专员'] },
+    meta: { roles: ['销售经理'] },
+  },
+  {
+    path: '/settings/users',
+    component: () => import('../views/settings/UserList.vue'),
+    meta: { roles: ['销售经理'] },
   },
 ]
 

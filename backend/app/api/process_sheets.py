@@ -3,7 +3,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.process_sheet import (
-    ProcessSheetCreate, ProcessSheetOut, ProcessSheetUpdateDetail
+    ProcessSheetCreate, ProcessSheetOut, ProcessSheetUpdateDetail, MarkVersionRequest
 )
 from app.services import process_sheet as service
 from app.utils.pdf_generator import render_process_sheet, HAS_WEASYPRINT
@@ -60,18 +60,21 @@ def update_detail(
     items_data = [i.model_dump(exclude_unset=True) for i in data.items] if data.items else None
     return service.update_sheet_detail(
         db, id, data.detail_data, items_data,
-        current_user.display_name or current_user.username
+        current_user.display_name or current_user.username,
+        change_note=data.change_note,
     )
 
 
-@router.post("/push-down/{contract_id}", response_model=ProcessSheetOut)
-def push_down(
-    contract_id: int,
+@router.post("/{id}/mark-version", response_model=ProcessSheetOut)
+def mark_version(
+    id: int,
+    data: MarkVersionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.push_down_from_contract(
-        db, contract_id, current_user.display_name or current_user.username
+    return service.mark_version(
+        db, id, data.note,
+        current_user.display_name or current_user.username,
     )
 
 

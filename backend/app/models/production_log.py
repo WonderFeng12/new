@@ -12,7 +12,7 @@ class ProductionLog(Base):
     contract_item_id = Column(Integer, ForeignKey("contract_item.id"), nullable=True)
     from_status = Column(String(30), nullable=True)
     to_status = Column(String(30), nullable=False)
-    operation_type = Column(Enum("推进", "回退", "返工", "取消", "确认", "坯布下达"), nullable=False)
+    operation_type = Column(Enum("推进", "回退", "返工", "取消", "确认", "坯布下达", "重新编辑"), nullable=False)
     operator_id = Column(Integer, ForeignKey("user.id"), nullable=True)
     remark = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)

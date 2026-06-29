@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h2>{{ isEdit ? '编辑合同' : '新建合同' }}</h2>
+    <h2>{{ isEdit ? (contractStatus !== '草稿' ? '重新编辑合同' : '编辑合同') : '新建合同' }}</h2>
     <el-card style="margin:16px 0;max-width:1400px">
       <el-form :model="form" label-width="120px" v-loading="loading">
         <el-tabs type="border-card">
@@ -140,6 +140,7 @@ import { listBasicData } from '../../api/basicData'
 const route = useRoute()
 const router = useRouter()
 const isEdit = !!route.params.id
+const contractStatus = ref('')
 const loading = ref(false)
 const customers = ref([])
 const specs = ref([])
@@ -318,6 +319,7 @@ onMounted(async () => {
   if (isEdit) {
     try {
       const res = await getContract(route.params.id)
+      contractStatus.value = res.data.status
       Object.assign(form, res.data)
     } catch { ElMessage.error('加载合同失败') }
   }

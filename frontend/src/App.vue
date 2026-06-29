@@ -38,10 +38,18 @@
           <el-icon><Tools /></el-icon>
           <span>基础数据</span>
         </el-menu-item>
-        <el-menu-item v-if="store.role === '销售经理' || store.role === '生产专员'" index="/process-steps">
-          <el-icon><Setting /></el-icon>
-          <span>工序管理</span>
-        </el-menu-item>
+        <el-sub-menu v-if="store.role === '销售经理'" index="/settings">
+          <template #title>
+            <el-icon><Tools /></el-icon>
+            <span>系统设置</span>
+          </template>
+          <el-menu-item index="/settings/users">
+            <span>用户管理</span>
+          </el-menu-item>
+          <el-menu-item index="/settings/wecom">
+            <span>企业微信</span>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     <el-container>
@@ -67,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from './store/user'
 
@@ -77,6 +85,12 @@ const store = useUserStore()
 
 const isLogin = computed(() => route.path === '/login' || route.path.startsWith('/confirm/'))
 const showContracts = computed(() => store.role !== '生产专员')
+
+onMounted(() => {
+  if (store.token && !store.user) {
+    store.fetchUser()
+  }
+})
 
 function handleCommand(cmd) {
   if (cmd === 'logout') {

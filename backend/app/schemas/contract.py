@@ -149,6 +149,7 @@ class ContractOut(BaseModel):
     emboss_model: Optional[str] = ""
     total_amount: Optional[float] = None
     status: str = "草稿"
+    latest_confirm_version: Optional[int] = 0
     is_pushed_down: bool = False
     push_down_sheet_id: Optional[int] = None
     tech_note_1: Optional[str] = ""

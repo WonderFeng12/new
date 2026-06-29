@@ -31,6 +31,7 @@ class ContractItem(Base):
     remark = Column(Text)
     production_status = Column(String(30), nullable=True)
     yarn_plan_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    yarn_plan_no = Column(String(100), nullable=True, comment="坯布计划单号")
     cancel_quantities = Column(JSON, nullable=True)
     cancel_reason = Column(Text, nullable=True)
 

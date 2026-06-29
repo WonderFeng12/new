@@ -311,6 +311,13 @@ def release_yarn_plan(
 
     item.production_status = "yarn_plan"
     item.yarn_plan_user_id = yarn_plan_user_id
+    if not item.yarn_plan_no:
+        from datetime import date
+        today = date.today()
+        count = db.query(ContractItem).filter(
+            ContractItem.yarn_plan_no.isnot(None)
+        ).count()
+        item.yarn_plan_no = f"YP{today.strftime('%Y%m')}{count + 1:04d}"
     db.flush()
 
     log = ProductionLog(
@@ -366,50 +373,67 @@ def get_my_tasks(db: Session, user_id: int):
     ).order_by(ContractItem.id.desc()).all()
 
 
-def push_down_item_to_process_sheet(db: Session, item_id: int, user_id: int):
-    """行项目下推为工艺单。"""
-    item = db.query(ContractItem).filter(ContractItem.id == item_id).first()
+def push_down_item_to_process_sheet(db: Session, item_id: int, user_id: int, process_remark: str = ""):
+    """行项目下推为工艺单（一个行项目生成一张独立的工艺单）。"""
+    item = db.query(ContractItem).options(
+        joinedload(ContractItem.spec)
+    ).filter(ContractItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="行项目不存在")
 
-    contract = db.query(Contract).filter(Contract.id == item.contract_id).first()
+    contract = db.query(Contract).options(
+        joinedload(Contract.customer)
+    ).filter(Contract.id == item.contract_id).first()
     if not contract or contract.is_deleted:
         raise HTTPException(status_code=404, detail="合同不存在")
     if contract.status == "草稿":
         raise HTTPException(status_code=400, detail="合同未确认，无法下推")
 
-    # Check if this item already has a process sheet item
-    existing = db.query(ProcessSheetItem).filter(
-        ProcessSheetItem.contract_item_id == item_id
+    # Check if this item already has a non-deleted process sheet
+    existing = db.query(ProcessSheetItem).join(ProcessSheet).filter(
+        ProcessSheetItem.contract_item_id == item_id,
+        ProcessSheet.is_deleted == False,
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="该行项目已下推工艺单")
 
-    # Find existing process sheet for this contract, or create one
-    sheet = db.query(ProcessSheet).filter(
-        ProcessSheet.contract_id == contract.id,
-        ProcessSheet.is_deleted == False,
-    ).first()
-    if not sheet:
-        from datetime import date
-        today = date.today()
-        seq = db.query(ProcessSheet).count() + 1
-        sheet = ProcessSheet(
-            contract_id=contract.id,
-            sheet_no=f"GY{today.strftime('%Y%m')}{seq:04d}",
-            confirm_version_no=0,
-            status="草稿",
-            created_by=contract.updated_by or contract.created_by,
-            updated_by=contract.updated_by or contract.created_by,
-        )
-        db.add(sheet)
-        db.flush()
+    # Each item gets its own process sheet
+    from datetime import date
+    today = date.today()
+    prefix = today.strftime('%Y%m')
+    count = db.query(ProcessSheet).filter(
+        ProcessSheet.sheet_no.like(f"{prefix}-%")
+    ).count()
+    sheet = ProcessSheet(
+        contract_id=contract.id,
+        sheet_no=f"{prefix}-{count + 1:03d}",
+        confirm_version_no=contract.latest_confirm_version or 0,
+        status="草稿",
+        created_by=contract.updated_by or contract.created_by,
+        updated_by=contract.updated_by or contract.created_by,
+        contract_snapshot={
+            "contract_no": contract.contract_no,
+            "customer_name": contract.customer.name if contract.customer else None,
+            "contract_date": str(contract.contract_date) if contract.contract_date else None,
+            "delivery_date": str(item.delivery_date) if item.delivery_date else None,
+            "spec_description": item.spec_description,
+            "spec_name": item.spec.spec_name if item.spec else None,
+            "qty": float(item.qty) if item.qty else 0,
+            "packaging_type": item.packaging_type or "",
+            "is_pressed": item.is_pressed or False,
+            "pattern_count": item.pattern_count or 0,
+            "remark": item.remark or "",
+            "latest_confirm_version": contract.latest_confirm_version or 0,
+        },
+    )
+    db.add(sheet)
+    db.flush()
 
-    # Create process sheet item
+    # Create process sheet item (one item per sheet)
     sheet_item = ProcessSheetItem(
         process_sheet_id=sheet.id,
         contract_item_id=item.id,
-        line_no=item.line_no,
+        line_no=1,
         spec_id=item.spec_id,
         is_pressed=item.is_pressed,
         packaging_type=item.packaging_type or "",
@@ -426,6 +450,8 @@ def push_down_item_to_process_sheet(db: Session, item_id: int, user_id: int):
         image_b_2=item.image_b_2 or "",
         image_b_3=item.image_b_3 or "",
         remark=item.remark or "",
+        process_remark=process_remark,
+        qty=item.qty or 0,
     )
     db.add(sheet_item)
 
@@ -447,6 +473,24 @@ def push_down_item_to_process_sheet(db: Session, item_id: int, user_id: int):
     db.commit()
     db.refresh(sheet)
     return sheet
+
+
+def get_process_sheet_for_item(db: Session, item_id: int) -> dict | None:
+    """Get process sheet info for a contract item."""
+    sheet_item = db.query(ProcessSheetItem).filter(
+        ProcessSheetItem.contract_item_id == item_id
+    ).options(
+        joinedload(ProcessSheetItem.process_sheet),
+    ).first()
+    if not sheet_item or not sheet_item.process_sheet or sheet_item.process_sheet.is_deleted:
+        return None
+    sheet = sheet_item.process_sheet
+    return {
+        "id": sheet.id,
+        "sheet_no": sheet.sheet_no,
+        "status": sheet.status,
+        "confirm_version_no": sheet.confirm_version_no,
+    }
 
 
 def item_has_process_sheet(db: Session, item_id: int) -> bool:
