@@ -217,6 +217,12 @@ watch(() => form.customer_id, async (val) => {
   } catch {}
 })
 
+// Header delivery_date change → auto-update all item delivery_dates
+watch(() => form.delivery_date, (val) => {
+  if (!val) return
+  form.items.forEach(item => { item.delivery_date = val })
+})
+
 function openSpecDialog(row) {
   specTargetRow.value = row
   specForm.length = ''; specForm.width = ''; specForm.weight = ''; specForm.layer_type = '单层'
@@ -293,14 +299,17 @@ async function handleSave() {
         return base
       }),
     }
+    let contractId
     if (isEdit) {
       await updateContract(route.params.id, payload)
       ElMessage.success('已更新')
+      contractId = route.params.id
     } else {
-      await createContract(payload)
+      const res = await createContract(payload)
       ElMessage.success('已创建')
+      contractId = res.data.id
     }
-    router.push('/contracts')
+    router.push(`/contracts/${contractId}`)
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || '保存失败')
   } finally {

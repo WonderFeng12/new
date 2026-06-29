@@ -10,6 +10,7 @@ export function advanceItem(id, data) { return api.post(`/contract-items/${id}/a
 export function rollbackItem(id, data) { return api.post(`/contract-items/${id}/rollback`, data) }
 export function reworkItem(id, data) { return api.post(`/contract-items/${id}/rework`, data) }
 export function cancelItem(id, data) { return api.post(`/contract-items/${id}/cancel`, data) }
+export function restoreItem(id) { return api.post(`/contract-items/${id}/restore`) }
 export function releaseYarnPlan(id, data) { return api.post(`/contract-items/${id}/yarn-plan`, data) }
 export function pushDownItem(id, data = {}) { return api.post(`/contract-items/${id}/push-down`, data) }
 
@@ -21,3 +22,6 @@ export function getMyTasks() { return api.get('/my-tasks') }
 export function getWecomSettings() { return api.get('/settings/wecom') }
 export function updateWecomSettings(data) { return api.put('/settings/wecom', data) }
 export function updateMyWecom(data) { return api.put('/users/me/wecom', data) }
+
+export function getDefaultConfirmUsers() { return api.get('/settings/default-confirm-users') }
+export function setDefaultConfirmUsers(data) { return api.put('/settings/default-confirm-users', data) }

@@ -121,13 +121,16 @@
 │       │   ├── upload.js
 │       │   ├── processSheet.js
 │       │   ├── basicData.js
-│       │   └── production.js
+│       │   ├── production.js
+│       │   ├── user.js                    # 用户管理 API
+│       │   └── webhookConfig.js           # Webhook 配置 API
 │       ├── store/
 │       │   └── user.js
 │       ├── router/
 │       │   └── index.js
 │       ├── components/
-│       │   └── ImageUploader.vue
+│       │   ├── ImageUploader.vue
+│       │   └── StatusLog.vue
 │       └── views/
 │           ├── login/Login.vue
 │           ├── dashboard/Dashboard.vue
@@ -136,6 +139,7 @@
 │           ├── contract/ (ContractList, ContractForm, ContractDetail)
 │           ├── processSheet/ (SheetList, SheetDetail)
 │           ├── basicData/BasicDataList.vue
+│           ├── settings/ (WeComSettings.vue, UserList.vue)
 │           └── public/ConfirmPage.vue
 ```
 
@@ -189,7 +193,7 @@
 - **status**: ENUM('草稿','确认','已下发')，默认草稿
 - **is_pushed_down**: BOOLEAN 是否下推行项目到工艺单
 - **push_down_sheet_id**: INT 关联工艺单 ID
-- **latest_confirm_version**: INT 版本号：确认后=V1，重新编辑递增
+- **latest_confirm_version**: INT 版本号：确认后初始 V1，重新确认版本+1
 - **confirm_requested_at**: DATETIME 请求确认时间
 - **last_reminded_at**: DATETIME 催办提醒时间
 
@@ -212,7 +216,10 @@
 | **yarn_plan_user_id**(FK) | 坯布负责人（外协人员）|
 | **yarn_plan_no** | 坯布计划单号 |
 | **cancel_reason** | TEXT 取消原因 |
-| **cancel_quantities** | JSON 取消数量 |
+| **cancel_quantities** | JSON 取消数据（含 snapshot: contract_version, production_status, restored 等恢复用字段） |
+| has_process_sheet | 是否已下推工艺单（计算属性，非持久化） |
+| process_sheet_id / process_sheet_no / process_sheet_status / process_sheet_version | 关联工艺单信息（计算属性，非持久化） |
+| yarn_plan_user_name | 坯布负责人姓名（计算属性，非持久化） |
 
 ### 确认图版本 (confirm_image)
 | 字段 | 说明 |
@@ -230,14 +237,18 @@
 |------|------|
 | contract_id(FK) | 关联合同 |
 | sheet_no | 工艺单号 `月-序号` 或 `YYYYMM-序号` |
-| confirm_version_no | DECIMAL：下推时取合同最新版本号 |
+| confirm_version_no | DECIMAL：工艺单独立版本号，初始 V0，客户沟通后递增 |
 | status | ENUM('草稿','保存','已下发','已确认','修改中') |
 | version_marked | BOOLEAN 是否标记客户沟通 |
 | version_note | TEXT 版本标记说明 |
 | confirm_token | VARCHAR(36) UUID 公开确认链接令牌 |
 | customer_comment | TEXT 客户意见 |
+| customer_confirmed | BOOLEAN 客户是否已通过公开链接确认 |
+| internal_confirm_required | INT 内部确认所需人数，默认1（保留向后兼容，实际以名单人数为准）|
+| internal_confirmed_users | JSON 已内部确认的用户ID列表 |
+| **confirm_user_ids** | **JSON 工艺单指定的内部确认人用户ID列表，新建时从系统配置继承** |
 | detail_data | JSON 生产详情 |
-| contract_snapshot | JSON 下推时合同快照 |
+| contract_snapshot | JSON 下推时合同快照（含 contract_no, latest_confirm_version, customer_name 等）|
 | contract_snapshot_item | JSON 行项目快照 |
 
 ### 工艺单行项目 (process_sheet_item)
@@ -279,11 +290,14 @@
 |------|------|
 | contract_id(FK) | 关联合同 |
 | contract_item_id(FK) | 关联行项目 |
+| process_sheet_id(FK) | 关联工艺单 |
 | from_status / to_status | 状态变更 |
-| operation_type | ENUM('推进','回退','返工','取消','确认','坯布下达','重新编辑') |
+| operation_type | ENUM('推进','回退','返工','取消','确认','坯布下达','重新编辑','修改','创建') |
 | operator_id(FK) | 操作人 |
 | remark | 备注 |
 | notify_status | VARCHAR(20) 通知状态 |
+
+> 每次合同保存（`update_contract`）和工艺单保存（`update_sheet_detail`）均会创建 `operation_type='修改'` 的日志，摘要自动对比变更字段生成。工艺单的 mark_version/confirm/dispatch 也会创建对应日志。`operation_type='创建'` 用于合同/工艺单新建时记录。
 
 ### Webhook 配置 (webhook_config)
 | 字段 | 说明 |
@@ -302,11 +316,14 @@
 
 ### 合同
 ```
-草稿 → (销售经理确认) → 确认 → (下推行项目工艺单) → 已下发
+草稿 → (销售经理确认, V+1) → 确认(V1) → (下推行项目工艺单) → 已下发
+  ↑                               │
+  └── (重新编辑→草稿, 版本不变) ────┘
 ```
 - **草稿**: 可编辑、可生成确认图、可删除
-- **确认**: 已确认、可下推行项目到工艺单
+- **确认**: 已确认、可下推行项目到工艺单；`latest_confirm_version` 每次确认递增（V1→V2→V3...）
 - **已下发**: 有行项目已下推工艺单
+- **重新打开编辑** → 状态回到草稿，版本保持不变，需再次确认后版本+1
 
 ### 合同行项目生产状态（工序驱动）
 ```
@@ -319,15 +336,24 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 - 回退/返工仅销售经理/生产专员可操作
 - 可在任意工序取消（cancelled）
 
-### 工艺单
+### 工艺单（独立于合同的版本体系，两步确认）
 ```
-纯草稿(V0) → (客户沟通) → V0.11 → (修改) → V0.12 → ...
-→ (客户确认) → 保存(V1) → (下发) → 已下发
-                                → (再沟通) → 沟通中(V2...)
+纯草稿(V0) → (客户沟通) → V0.11 → (修改保存) → V0.12 → ...
+→ (客户公开页确认) → V0.5(草稿) → (指定人员内部确认) → V1(保存) → (下发→打印) → 已下发
+                                      → (重新编辑) → 重置客户状态，版本不变，可继续编辑
+保存(V1+) → (重新编辑) → 回草稿，版本不变 → ...
 ```
-- 纯草稿版本 = 0，可随意修改
-- 客户沟通后每次保存版本 +0.01
-- 确认后进位到整数 V1/V2...
+- **纯草稿**（`confirm_version_no` = 0）：显示 V0，无版本，可随意修改
+- **客户沟通标记**（首次点击）：从 V0 → V0.11，开启版本追踪
+- **后续每次保存**：`confirm_version_no` 自动 +0.01（V0.12 → V0.13...）
+- **客户确认（公开页）**：设置 `customer_confirmed=True`，版本设为 V0.5，状态保持"草稿"，等待内部确认
+- **内部确认**：由指定的确认人名单人员逐一确认，全部完成后版本进位到整数（V1），状态→"保存"
+- **重新编辑**：重置 `customer_confirmed=False`、清空 `internal_confirmed_users`；**版本号保持不变**（与合同逻辑一致）
+- **PDF 打印**：V1（保存）后可打印，右上角显示工艺单版本号 + 下发日期时间
+- **与合同版本的关系**：
+  - 合同 `latest_confirm_version`：销售经理确认后初始 V1，重新确认版本+1
+  - 工艺单 `confirm_version_no`：纯草稿 V0，客户沟通触发版本追踪
+  - 工艺单详情页显示「下推时合同版本」与「当前合同最新版本」对比
 
 ## 业务规则
 
@@ -347,11 +373,24 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 | B017-B020 | 前端自动生成说明 | ContractForm.vue |
 | B021-B022 | 公开确认链接 | contract service + public API |
 | B023-B024 | 工艺单版本号规则 | process_sheet service |
-| B025 | 工艺单 confirm_version_no 下推时取合同 latest_confirm_version | production service |
+| B025 | 工艺单 confirm_version_no 初始 V0（独立版本体系），合同版本存于 contract_snapshot 供对比 | production service → create_sheet_from_items |
 | B026 | 行项目级别排产：坯布计划下达后 production_status=yarn_plan | production service |
 | B027 | 生产推进校验工序负责人权限 | production service |
 | B028 | 删除工艺单时硬删除 ProcessSheetItem、重置合同行项目下推状态 | process_sheet service |
 | B029 | 坯布计划可指定外协人员 | production service → release_yarn_plan |
+| B030 | 工艺单版本历史展示合同版本对比：下推时快照版本 vs 当前合同最新版本 | SheetDetail.vue → contractVersionMatch computed |
+| B031 | 每日 8:00 定时检查未确认合同，企微催办销售经理 | reminder.py → APScheduler
+| B032 | 工艺单两步确认：客户公开页确认→V0.5，指定确认人逐一内部确认全部完成→V1；客户确认后企微通知指定确认人；重新编辑重置客户确认状态，版本不变 | process_sheet service → customer_confirm_sheet / internal_confirm_sheet / reopen_sheet_edit |
+| B033 | 合同重新打开编辑时状态改为草稿，版本号不变；确认时版本+1 | contract service → reopen_edit / manual_confirm_contract |
+| B038 | 工艺单可设置具体内部确认人（confirm_user_ids），新建时从系统配置继承默认名单；仅名单中用户可执行内部确认 | process_sheet service → create_sheet_from_items / internal_confirm_sheet |
+| B039 | 工艺单保存时自动对比变更字段（detail_data + 行项目字段），生成变更摘要写入操作日志 remark | process_sheet service → update_sheet_detail |
+| B040 | 客户公开页确认后自动企微通知工艺单指定的确认人，@提及对应人员 | process_sheet service → customer_confirm_sheet + notify service |
+| B041 | 工艺单重新编辑仅改状态回草稿，版本号保持不变（与合同逻辑一致）| process_sheet service → reopen_sheet_edit |
+| B042 | 工艺单 V1（保存）后可打印 PDF，右上角显示工艺单版本号+下发日期时间 | pdf_generator + print API |
+| B034 | 取消行项目时保存合同版本快照（含 contract_version, production_status），支持恢复 | production service → cancel_item / restore_item |
+| B035 | 已取消行项目不可下推工艺单或下达坯布计划（按钮灰化） | ContractDetail.vue → canPushDown / canReleaseYarn |
+| B036 | 创建合同时自动记录 operation_type='创建' 的日志 | contract service → create_contract |
+| B037 | 编辑合同时自动对比变更字段，生成详细摘要写入日志 remark | contract service → update_contract → _build_change_summary |
 
 ## API 端点
 
@@ -369,15 +408,28 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 - `PUT /contracts/{id}` — 更新（草稿/可编辑）
 - `DELETE /contracts/{id}` — 删除（仅草稿）
 - `POST /contracts/{id}/confirm-image` — 生成确认图
-- `POST /contracts/{id}/manual-confirm` — 销售经理手动确认（带意见）
+- `POST /contracts/{id}/manual-confirm` — 销售经理手动确认（版本+1，带意见）
 - `POST /contracts/{id}/request-confirm` — 业务员请求确认（企微通知）
-- `POST /contracts/{id}/reopen-edit` — 重新打开编辑（递增版本号）
+- `POST /contracts/{id}/reopen-edit` — 重新打开编辑（状态→草稿，版本号不变）
 - `POST /contracts/{id}/generate-confirm-link` — 生成确认链接
 - `GET /contracts/{id}/versions` — 确认图版本历史
 - `GET /contracts/{id}/production-logs` — 生产日志
 
 ### 工艺单 `/api/process-sheets`
-- CRUD + push-down + detail + mark-version + confirm + dispatch + print
+- `GET /process-sheets` — 工艺单列表
+- `GET /process-sheets/{id}` — 工艺单详情（含快照、合同信息）
+- `POST /process-sheets` — 新建（仅通过合同行项目下推触发）
+- `PUT /process-sheets/{id}/detail` — 保存工艺详情（含行项目明细、detail_data；自动对比变更写入操作日志）
+- `POST /process-sheets/{id}/mark-version` — 标记客户沟通（版本 +0.01，首次 V0→V0.11）
+- `POST /process-sheets/{id}/internal-confirm` — 内部确认一次（仅确认人名单中用户可操作）
+- `POST /process-sheets/{id}/reopen-edit` — 重新打开编辑（状态→草稿，版本不变，重置客户确认状态）
+- `PUT /process-sheets/{id}/confirm-users` — 设置工艺单内部确认人（仅销售经理）
+- `PUT /process-sheets/{id}/confirm-requirements` — 设置需确认人数（仅销售经理，保留兼容）
+- `POST /process-sheets/{id}/dispatch` — 下发工艺单
+- `GET /process-sheets/{id}/print` — 打印工艺单 PDF（右上角版本号+下发日期）
+- `DELETE /process-sheets/{id}` — 删除（恢复行项目下推状态）
+- `POST /process-sheets/{id}/generate-confirm-link` — 生成客户确认链接
+- `GET /process-sheets/{id}/logs` — 工艺单操作日志列表（按时间降序）
 
 ### 生产流程 `/api` (production router)
 - `GET /process-steps` — 工序列表
@@ -388,7 +440,8 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 - `POST /contract-items/{id}/advance` — 推进到下一工序
 - `POST /contract-items/{id}/rollback` — 回退一工序
 - `POST /contract-items/{id}/rework` — 返工到指定工序
-- `POST /contract-items/{id}/cancel` — 取消行项目
+- `POST /contract-items/{id}/cancel` — 取消行项目（快照合同版本+生产状态）
+- `POST /contract-items/{id}/restore` — 恢复已取消的行项目（还原到取消前状态）
 - `POST /contract-items/{id}/yarn-plan` — 下达坯布计划
 - `POST /contract-items/{id}/push-down` — 下推工艺单
 - `GET /contract-items/{id}/logs` — 行项目生产日志
@@ -404,7 +457,17 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 ### 公开接口 `/api/public` — GET /contract/{token}, POST /confirm/{token}
 
 ### 用户管理 `/api/users` — CRUD（仅销售经理）
+- `GET /users` — 用户列表
+- `POST /users` — 新建用户
+- `PUT /users/{id}` — 编辑用户信息
+- `PUT /users/{id}/reset-password` — 重置密码
+- `DELETE /users/{id}` — 删除用户
+
 ### Webhook配置 `/api/webhook-configs` — CRUD（仅销售经理）
+- `GET /webhook-configs` — 配置列表
+- `POST /webhook-configs` — 新增配置
+- `PUT /webhook-configs/{id}` — 编辑配置
+- `DELETE /webhook-configs/{id}` — 删除配置
 
 ## 角色权限
 
@@ -418,9 +481,14 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 | 重新打开编辑 | 不可 | 可 | 可 | 不可 |
 | 下推行项目工艺单 | 不可 | 可 | 可 | 不可 |
 | 推进/回退/返工/取消 | 仅取消自己合同 | 全部 | 全部 | 不可 |
+| 恢复取消行项目 | 不可 | 可 | 可 | 不可 |
 | 坯布计划下达 | 不可 | 可 | 可 | 不可 |
 | 查看工艺单 | 仅关联 | 全部 | 全部 | 不可 |
 | 编辑/删除工艺单 | 不可 | 可 | 可 | 不可 |
+| 内部确认 | 不可 | 仅确认人名单中 | 仅确认人名单中 | 不可 |
+| 设置工艺单确认人 | 不可 | 可 | 不可 | 不可 |
+| 重新打开工艺单编辑 | 不可 | 可 | 可 | 不可 |
+| 打印工艺单 PDF | 不可 | 可（V1+） | 可（V1+） | 不可 |
 | 下发工艺单 | 不可 | 可 | 可 | 不可 |
 | 查看我的任务 | - | - | - | 仅自己 |
 | 管理用户 | 不可 | 可 | 不可 | 不可 |
@@ -434,15 +502,17 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 2. 业务员填写完成 → 点击「请求确认」→ 企微通知销售经理
 3. 销售经理打开合同详情 → 点击「手动确认」→ 填写确认意见 → 合同→确认(V1)
 4. 在合同详情中，选择行项目 → 点击「下推工艺单」→ 弹出工艺备注弹窗
-5. 系统创建工艺单(草稿,版本=合同版本) → 跳转到工艺单详情页
-6. 编辑工艺单详情 → 点击「客户沟通」→ 版本标记 V0.11
-7. (可选) 生成公开确认链接发给客户确认
-8. 点击「客户确认」→ 版本进位到 V1 → 工艺单→保存
-9. 下发工艺单 → 工艺单→已下发
+5. 系统创建工艺单(草稿,V0) → 跳转到工艺单详情页
+6. 编辑工艺单详情 → 点击「客户沟通」→ 版本标记 V0.11，生成确认链接发给客户
+7. 客户打开链接确认 → 版本 V0.5(草稿)，customer_confirmed=True → 企微自动通知指定确认人
+8. 指定确认人逐一点击「内部确认」→ 企微通知进度 → 全部确认完成 → 版本 V1(保存)
+9. （可选）打印工艺单 PDF → 右上角版本号+日期
+10. 下发工艺单 → 工艺单→已下发
 10. 在合同详情中，为行项目下达坯布计划 → 指定外协人员
 11. 生产推进：每工序完成由负责人点击推进 → 企微通知下一工序负责人
 12. 遇到问题时：回退/返工（仅销售经理/生产专员）
-13. 需要取消时：填写原因取消行项目（企微通知）
+13. 需要取消时：填写原因取消行项目（企微通知，自动快照当前合同版本）
+14. 取消后可点击「恢复」取消的行项目，还原到取消前状态（合同版本变更时提示）
 ```
 
 ### 合同确认流程
@@ -453,8 +523,32 @@ yarn_plan → weaving → weaving_done → setting → setting_done
                                       ↓
                           点击[手动确认]，填写确认意见
                                       ↓
-                          合同→确认(latest_confirm_version=V1)
+                          合同→确认(latest_confirm_version +1)
 ```
+
+### 工艺单两步确认流程
+```
+客户打开公开链接 → 确认 → V0.5(草稿, customer_confirmed=True)
+                               ↓
+                    企微自动通知指定确认人：@{确认人1} {确认人2} ...
+                               ↓
+                    指定确认人逐一点击[内部确认]
+                               ↓
+                    企微通知："{用户名} 已确认（1/{总人数}）"
+                               ↓
+                    ... 所有确认人点击后 ...
+                               ↓
+                    企微通知："工艺单 {sheet_no} 已完成内部确认"
+                    版本 → V1，状态 → 保存（可打印PDF）
+```
+- 客户确认后状态保持"草稿"，版本为 V0.5，显示"客户已确认"标签
+- 内部确认人来源：工艺单级 `confirm_user_ids`（新建时从系统配置继承）
+- 仅确认人名单中用户可以执行内部确认
+- 客户确认后自动企微通知指定确认人（@提及）
+- 每次内部确认发送企微通知进度
+- 「重新编辑」按钮重置 `customer_confirmed=False`，清空内部确认列表，**版本号保持不变**
+- 从"保存"/"已确认"重新编辑时版本不变（V1→回草稿V1）
+- V1（保存）后详情页显示「打印」按钮，PDF 右上角显示版本号+当前日期时间
 
 ### 行项目下推 vs 旧合同下推
 - **行项目下推（V2新模式）**：在合同详情中，每个行项目有独立「下推工艺单」按钮，一个行项目只能下推一次

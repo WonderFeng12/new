@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import json
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
@@ -220,10 +221,17 @@ def get_contract_logs(
     logs = prod_service.get_contract_logs(db, id)
     result = []
     for log in logs:
+        # Get item line_no
+        item_no = None
+        if log.contract_item_id:
+            from app.models.contract_item import ContractItem
+            item = db.query(ContractItem).filter(ContractItem.id == log.contract_item_id).first()
+            item_no = item.line_no if item else None
         log_data = {
             "id": log.id,
             "contract_id": log.contract_id,
             "contract_item_id": log.contract_item_id,
+            "item_no": item_no,
             "from_status": log.from_status,
             "to_status": log.to_status,
             "operation_type": log.operation_type,
@@ -234,6 +242,18 @@ def get_contract_logs(
         }
         result.append(log_data)
     return result
+
+
+@router.post("/contract-items/{id}/restore")
+def restore_item(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ("销售经理", "生产专员"):
+        raise HTTPException(status_code=403, detail="权限不足")
+    item, log = prod_service.restore_item(db, id, current_user.id)
+    return {"message": "已恢复", "production_status": item.production_status}
 
 
 # ── My Tasks (for 外协人员) ──
@@ -292,6 +312,38 @@ def update_wecom_settings(
             config.config_value = value
         else:
             db.add(SystemConfig(config_key=key, config_value=value))
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/settings/default-confirm-users")
+def get_default_confirm_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("销售经理")),
+):
+    from app.models.system_config import SystemConfig
+    config = db.query(SystemConfig).filter(
+        SystemConfig.config_key == "process_sheet_confirm_users"
+    ).first()
+    user_ids = json.loads(config.config_value) if config and config.config_value else []
+    return {"user_ids": user_ids}
+
+
+@router.put("/settings/default-confirm-users")
+def set_default_confirm_users(
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("销售经理")),
+):
+    from app.models.system_config import SystemConfig
+    user_ids = data.get("user_ids", [])
+    config = db.query(SystemConfig).filter(
+        SystemConfig.config_key == "process_sheet_confirm_users"
+    ).first()
+    if config:
+        config.config_value = json.dumps(user_ids)
+    else:
+        db.add(SystemConfig(config_key="process_sheet_confirm_users", config_value=json.dumps(user_ids)))
     db.commit()
     return {"ok": True}
 

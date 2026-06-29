@@ -5,10 +5,12 @@ from app.database import get_db
 from app.schemas.process_sheet import (
     ProcessSheetCreate, ProcessSheetOut, ProcessSheetUpdateDetail, MarkVersionRequest
 )
+from app.schemas.production_log import ProductionLogOut
 from app.services import process_sheet as service
 from app.utils.pdf_generator import render_process_sheet, HAS_WEASYPRINT
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
 from app.models.user import User
+from app.models.production_log import ProductionLog
 
 router = APIRouter(prefix="/api/process-sheets", tags=["process-sheets"])
 
@@ -87,6 +89,40 @@ def confirm(
     return service.confirm_sheet(db, id, current_user.display_name or current_user.username)
 
 
+@router.post("/{id}/internal-confirm", response_model=ProcessSheetOut)
+def internal_confirm(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ("销售经理", "生产专员"):
+        raise HTTPException(status_code=403, detail="权限不足")
+    return service.internal_confirm_sheet(db, id, current_user)
+
+
+@router.post("/{id}/reopen-edit", response_model=ProcessSheetOut)
+def reopen_edit(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ("销售经理", "生产专员"):
+        raise HTTPException(status_code=403, detail="权限不足")
+    return service.reopen_sheet_edit(db, id, current_user)
+
+
+@router.put("/{id}/confirm-requirements", response_model=ProcessSheetOut)
+def set_confirm_reqs(
+    id: int,
+    required_count: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "销售经理":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return service.set_confirm_requirements(db, id, required_count, current_user)
+
+
 @router.post("/{id}/dispatch", response_model=ProcessSheetOut)
 def dispatch(
     id: int,
@@ -100,12 +136,12 @@ def dispatch(
 def print_sheet(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("销售经理", "生产专员")),
 ):
     sheet = service.get_sheet(db, id)
     if not sheet:
         raise HTTPException(status_code=404, detail="工艺单不存在")
-    pdf_bytes = render_process_sheet(sheet, sheet.contract, sheet.contract.items)
+    pdf_bytes = render_process_sheet(sheet, sheet.contract, sheet.items)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -122,6 +158,38 @@ def delete(
     if not service.delete_sheet(db, id):
         raise HTTPException(status_code=404, detail="工艺单不存在")
     return {"message": "已删除"}
+
+
+@router.get("/{id}/logs", response_model=list[ProductionLogOut])
+def get_sheet_logs(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    logs = db.query(ProductionLog).filter(
+        ProductionLog.process_sheet_id == id,
+    ).order_by(ProductionLog.created_at.desc()).all()
+    # Attach operator name
+    from app.models.user import User as UserModel
+    for log in logs:
+        if log.operator_id:
+            u = db.query(UserModel).filter(UserModel.id == log.operator_id).first()
+            log.operator_name = u.display_name if u else None
+        else:
+            log.operator_name = None
+    return logs
+
+
+@router.put("/{id}/confirm-users", response_model=ProcessSheetOut)
+def set_confirm_users(
+    id: int,
+    user_ids: list[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "销售经理":
+        raise HTTPException(status_code=403, detail="权限不足")
+    return service.set_confirm_users(db, id, user_ids, current_user)
 
 
 @router.post("/{id}/generate-confirm-link")

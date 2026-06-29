@@ -33,9 +33,10 @@ def get_process_sheet_by_token(
     if not sheet:
         raise HTTPException(status_code=404, detail="确认链接无效或已过期")
 
-    if sheet.status == "已确认":
+    if sheet.customer_confirmed:
         return {
             "already_confirmed": True,
+            "customer_confirmed": True,
             "sheet_no": sheet.sheet_no,
             "status": sheet.status,
         }
@@ -61,6 +62,7 @@ def get_process_sheet_by_token(
             "image_b_1": item.image_b_1 or "",
             "image_b_2": item.image_b_2 or "",
             "image_b_3": item.image_b_3 or "",
+            "pressed_image": item.pressed_image or "",
             "qty": float(item.qty) if item.qty else 0,
             "process_remark": item.process_remark or "",
             "remark": item.remark or "",
@@ -68,6 +70,7 @@ def get_process_sheet_by_token(
 
     return {
         "already_confirmed": False,
+        "customer_confirmed": False,
         "id": sheet.id,
         "contract_id": sheet.contract_id,
         "sheet_no": sheet.sheet_no,
@@ -77,6 +80,7 @@ def get_process_sheet_by_token(
         "contract_contract_no": contract.contract_no if contract else "",
         "contract_customer_name": contract.customer.name if contract and contract.customer else "",
         "contract_date": str(contract.contract_date) if contract and contract.contract_date else "",
+        "detail_data": sheet.detail_data or {},
         "items": items_data,
     }
 

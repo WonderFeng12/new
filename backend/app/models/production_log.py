@@ -10,9 +10,10 @@ class ProductionLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     contract_id = Column(Integer, ForeignKey("contract.id"), nullable=False)
     contract_item_id = Column(Integer, ForeignKey("contract_item.id"), nullable=True)
+    process_sheet_id = Column(Integer, ForeignKey("process_sheet.id"), nullable=True)
     from_status = Column(String(30), nullable=True)
     to_status = Column(String(30), nullable=False)
-    operation_type = Column(Enum("推进", "回退", "返工", "取消", "确认", "坯布下达", "重新编辑"), nullable=False)
+    operation_type = Column(Enum("推进", "回退", "返工", "取消", "确认", "坯布下达", "重新编辑", "修改", "创建"), nullable=False)
     operator_id = Column(Integer, ForeignKey("user.id"), nullable=True)
     remark = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
@@ -21,6 +22,7 @@ class ProductionLog(Base):
     __table_args__ = (
         Index("idx_item_log", "contract_item_id", "created_at"),
         Index("idx_contract_log", "contract_id", "created_at"),
+        Index("idx_process_sheet_log", "process_sheet_id", "created_at"),
     )
 
     contract = relationship("Contract")

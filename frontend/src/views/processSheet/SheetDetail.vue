@@ -8,12 +8,29 @@
             工艺单号: {{ sheet?.sheet_no }}
             <el-tag v-if="formatVersion(sheet?.confirm_version_no)" size="small" type="info" style="margin-left:8px">{{ formatVersion(sheet?.confirm_version_no) }}</el-tag>
             <el-tag v-if="sheet?.version_marked" size="small" type="warning" style="margin-left:8px">沟通中</el-tag>
+            <el-tag v-if="sheet?.customer_confirmed && sheet?.status === '草稿'" size="small" type="success" style="margin-left:8px">客户已确认</el-tag>
           </span>
           <span>
             <el-tag :type="statusType(sheet?.status)" size="small">{{ sheet?.status }}</el-tag>
-            <el-button size="small" type="warning" style="margin-left:8px" @click="showMarkDialog = true" :disabled="sheet?.status!=='草稿'" :plain="!!sheet?.version_marked">客户沟通</el-button>
-            <el-button size="small" type="success" style="margin-left:8px" @click="handleConfirm" :disabled="sheet?.status!=='草稿' || !formatVersion(sheet?.confirm_version_no)">客户确认</el-button>
-            <el-button size="small" type="primary" @click="handleDispatch" :disabled="sheet?.status!=='保存'">下发工艺单</el-button>
+            <template v-if="sheet?.status === '草稿' && !sheet?.customer_confirmed">
+              <el-button size="small" type="warning" style="margin-left:8px" @click="showMarkDialog = true" :disabled="sheet?.status!=='草稿'" :plain="!!sheet?.version_marked">客户沟通</el-button>
+              <el-button v-if="userStore.role === '销售经理'" size="small" style="margin-left:8px" @click="handleOpenConfirmUsers">设置确认人</el-button>
+            </template>
+            <template v-else-if="sheet?.status === '草稿' && sheet?.customer_confirmed">
+              <span style="margin-left:8px;font-size:12px;color:#e6a23c;vertical-align:middle">
+                客户已确认，待内部确认 ({{ internalConfirmCount }}/{{ sheet?.internal_confirm_required || 1 }})
+              </span>
+              <el-button v-if="canInternalConfirm" size="small" type="success" style="margin-left:8px" @click="handleInternalConfirm">内部确认</el-button>
+              <el-button v-if="canReopenEdit" size="small" type="danger" plain style="margin-left:8px" @click="handleReopenEdit">重新编辑</el-button>
+            </template>
+            <template v-else-if="sheet?.status === '保存' || sheet?.status === '已确认'">
+              <el-button size="small" type="primary" @click="handleDispatch" :disabled="sheet?.status === '已下发'">下发工艺单</el-button>
+              <el-button v-if="canReopenEdit" size="small" type="danger" plain style="margin-left:8px" @click="handleReopenEdit">重新编辑</el-button>
+              <el-button size="small" style="margin-left:8px" @click="handlePrint">打印</el-button>
+            </template>
+            <template v-if="sheet?.status === '已下发'">
+              <el-button size="small" style="margin-left:8px" @click="handlePrint">打印</el-button>
+            </template>
           </span>
         </div>
       </template>
@@ -23,6 +40,15 @@
           <el-link type="primary" @click="$router.push(`/contracts/${sheet?.contract?.id}`)">{{ sheet?.contract?.contract_no }}</el-link>
         </el-descriptions-item>
         <el-descriptions-item label="客户">{{ sheet?.contract?.customer?.name }}</el-descriptions-item>
+        <el-descriptions-item label="合同版本">
+          <template v-if="sheet?.contract_snapshot">
+            {{ formatVersion(sheet?.contract_snapshot?.latest_confirm_version) || 'V0' }}
+            <el-tag v-if="contractVersionMatch" :type="contractVersionMatch.match ? 'success' : 'warning'" size="small" style="margin-left:4px">
+              {{ contractVersionMatch.match ? '一致' : '不一致' }}
+            </el-tag>
+          </template>
+          <span v-else>—</span>
+        </el-descriptions-item>
         <el-descriptions-item v-if="formatVersion(sheet?.confirm_version_no)" label="工艺单版本">
           {{ formatVersion(sheet?.confirm_version_no) }}
           <el-tag v-if="sheet?.version_note" size="small" type="info" style="margin-left:4px">{{ sheet?.version_note }}</el-tag>
@@ -30,41 +56,42 @@
         <el-descriptions-item v-else label="工艺单版本">—</el-descriptions-item>
         <el-descriptions-item label="状态">{{ sheet?.status }}</el-descriptions-item>
         <el-descriptions-item label="创建人">{{ sheet?.created_by }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ sheet?.created_at }}</el-descriptions-item>
         <el-descriptions-item label="合同日期">{{ sheet?.contract?.contract_date }}</el-descriptions-item>
         <el-descriptions-item label="交货日期">{{ sheet?.items?.[0]?.delivery_date || sheet?.contract?.delivery_date || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="数量">{{ sheet?.items?.[0]?.qty || 0 }} 条</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ sheet?.created_at }}</el-descriptions-item>
       </el-descriptions>
 
       <el-divider>行项目</el-divider>
 
-      <div v-if="sheet?.status === '草稿'" style="margin-bottom:8px;display:flex;gap:8px">
-        <el-button type="primary" size="small" :loading="savingDetail" @click="handleSaveDetail">保存工艺详情</el-button>
-      </div>
-
       <el-table :data="items" stripe size="small">
         <el-table-column prop="line_no" label="行号" width="60" />
-        <el-table-column label="毛毯规格" min-width="150">
+        <el-table-column label="毛毯规格" width="180">
           <template #default="{ row }">
             {{ getSpecName(row.spec_id) }}
           </template>
         </el-table-column>
-        <el-table-column label="包装方式" width="100">
+        <el-table-column label="包装方式" width="90">
           <template #default="{ row }">{{ row.packaging_type || '—' }}</template>
         </el-table-column>
-        <el-table-column label="压花" width="60">
+        <el-table-column label="包边材料" width="100">
+          <template #default="{ row }">{{ detailData.binding_material || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="包边宽度" width="90">
+          <template #default="{ row }">{{ detailData.binding_width || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="压花" width="55">
           <template #default="{ row }">{{ row.is_pressed ? '是' : '否' }}</template>
         </el-table-column>
-        <el-table-column label="花型数" width="70">
+        <el-table-column label="花型数" width="65">
           <template #default="{ row }">{{ row.pattern_count || 0 }}</template>
         </el-table-column>
-        <el-table-column label="数量" width="80">
+        <el-table-column label="数量" width="75">
           <template #default="{ row }">{{ row.qty || 0 }}</template>
         </el-table-column>
-        <el-table-column label="交货日期" width="110">
+        <el-table-column label="交货日期" width="100">
           <template #default="{ row }">{{ row.delivery_date || '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row, $index }">
             <el-button size="small" type="primary" text :disabled="sheet?.status !== '草稿'" @click="openItemDetail($index)">明细</el-button>
             <el-button size="small" type="danger" text :disabled="sheet?.status !== '草稿'" @click="removeItem($index)">删除</el-button>
@@ -78,12 +105,30 @@
           <el-timeline-item timestamp="工艺单创建" :timestamp="sheet?.created_at || '—'" type="primary" size="large">
             <p style="margin:0">创建人: {{ sheet?.created_by || '—' }}</p>
             <p style="margin:0;font-size:12px;color:#999">版本 V0</p>
+            <template v-if="sheet?.contract_snapshot">
+              <p style="margin:4px 0 0;font-size:12px">
+                合同号: <el-link type="primary" style="font-size:12px" @click="$router.push(`/contracts/${sheet?.contract?.id}`)">{{ sheet?.contract_snapshot?.contract_no || '—' }}</el-link>
+              </p>
+              <p style="margin:2px 0 0;font-size:12px">
+                下推时合同版本: {{ formatVersion(sheet?.contract_snapshot?.latest_confirm_version) || 'V0' }}
+                <el-tag v-if="contractVersionMatch" :type="contractVersionMatch.match ? 'success' : 'warning'" size="small" style="margin-left:4px">
+                  {{ contractVersionMatch.match ? '版本一致' : '版本不一致' }}
+                </el-tag>
+              </p>
+              <p v-if="contractVersionMatch && !contractVersionMatch.match" style="margin:2px 0 0;font-size:12px;color:#e6a23c">
+                当前合同最新版本: {{ formatVersion(contractVersionMatch.current) }} — 建议重新下推
+              </p>
+            </template>
           </el-timeline-item>
-          <el-timeline-item v-if="sheet?.version_marked" timestamp="客户沟通标记" :timestamp="sheet?.updated_at || '—'" type="warning" size="large">
-            <p style="margin:0">当前版本: <strong>{{ formatVersion(sheet?.confirm_version_no) }}</strong></p>
-            <p v-if="sheet?.version_note" style="margin:0;font-size:12px;color:#666">说明: {{ sheet?.version_note }}</p>
+          <el-timeline-item v-for="(evt, ei) in commEvents" :key="'comm'+ei" timestamp="客户沟通标记" :timestamp="evt.created_at || '—'" type="warning" size="large">
+            <p style="margin:0;font-size:12px;color:#666">{{ evt.remark }}</p>
           </el-timeline-item>
-          <el-timeline-item v-if="sheet?.status === '保存' || sheet?.status === '已下发'" timestamp="客户已确认，版本锁定" :timestamp="sheet?.updated_at || '—'" type="success" size="large">
+          <el-timeline-item v-for="(evt, ei) in customerConfirmedFromLog" :key="'cc'+ei" :timestamp="evt.created_at || '—'" type="success" size="large">
+            <template #timestamp>客户已确认</template>
+            <p style="margin:0;font-size:12px;color:#666">{{ evt.remark }}</p>
+            <p v-if="evt.remark && !evt.remark.includes(sheet?.customer_comment || '') && sheet?.customer_comment" style="margin:4px 0 0;font-size:12px;color:#666">客户意见: {{ sheet?.customer_comment }}</p>
+          </el-timeline-item>
+          <el-timeline-item v-if="sheet?.status === '保存' || sheet?.status === '已确认' || sheet?.status === '已下发'" timestamp="内部确认完成，版本锁定" :timestamp="sheet?.updated_at || '—'" type="success" size="large">
             <p style="margin:0">正式版本: <strong>{{ formatVersion(sheet?.confirm_version_no) }}</strong></p>
           </el-timeline-item>
           <el-timeline-item v-if="sheet?.status === '已下发'" timestamp="工艺单已下发" :timestamp="sheet?.updated_at || '—'" type="primary" size="large">
@@ -93,13 +138,11 @@
       </div>
 
       <el-divider>操作日志</el-divider>
-      <el-table :data="sheetLogs" stripe size="small" v-if="sheetLogs.length">
-        <el-table-column prop="time" label="时间" width="160" />
-        <el-table-column prop="action" label="操作" width="120" />
-        <el-table-column prop="version" label="版本" width="100" />
-        <el-table-column prop="detail" label="说明" min-width="200" />
-      </el-table>
-      <div v-else style="color:#999;text-align:center;padding:16px">暂无操作记录</div>
+      <StatusLog
+        :logs="logs"
+        :columns="['时间','操作','备注']"
+        :loading="loadingLogs"
+      />
 
       <!-- 保存后在只读模式下显示花型信息 -->
       <div v-if="sheet?.status !== '草稿' && items.length">
@@ -186,6 +229,7 @@
                     <el-button size="small" @click="triggerEmbossUpload">上传压花图片</el-button>
                     <div v-if="activeItem.pressed_image" style="position:relative;display:inline-block;margin-left:8px">
                       <img :src="activeItem.pressed_image" style="width:60px;height:60px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />
+                      <div v-if="activeItem.pressed_image_name" style="font-size:10px;color:#666;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ activeItem.pressed_image_name }}</div>
                       <el-button size="small" circle style="position:absolute;top:-6px;right:-6px;padding:0;width:16px;height:16px;background:#f56c6c;color:#fff;border:none;font-size:10px;line-height:16px;min-height:auto" @click="removeEmbossImage">×</el-button>
                     </div>
                   </div>
@@ -369,21 +413,56 @@
     </el-dialog>
 
     <!-- 客户沟通对话框 -->
-    <el-dialog v-model="showMarkDialog" title="客户沟通" width="480px">
-      <p v-if="formatVersion(sheet?.confirm_version_no)" style="margin-bottom:12px;color:#666">
-        当前版本 {{ formatVersion(sheet?.confirm_version_no) }}，将标记用于客户沟通。每次保存版本自动 +0.01。
-      </p>
-      <p v-else style="margin-bottom:12px;color:#666">
-        将生成初始沟通版本 <strong>V0.11</strong>，开始与客户沟通。后续每次保存版本自动 +0.01。
-      </p>
-      <el-form>
-        <el-form-item label="沟通说明">
-          <el-input v-model="markNote" type="textarea" :rows="3" placeholder="请描述本次沟通或更改内容..." />
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="showMarkDialog" title="客户沟通" width="560px" :close-on-click-modal="!markingVersion">
+      <template v-if="!confirmLink">
+        <p v-if="formatVersion(sheet?.confirm_version_no)" style="margin-bottom:12px;color:#666">
+          当前版本 {{ formatVersion(sheet?.confirm_version_no) }}，将标记用于客户沟通。每次保存版本自动 +0.01。
+        </p>
+        <p v-else style="margin-bottom:12px;color:#666">
+          将生成初始沟通版本 <strong>V0.11</strong>，开始与客户沟通。后续每次保存版本自动 +0.01。
+        </p>
+        <el-form>
+          <el-form-item label="沟通说明">
+            <el-input v-model="markNote" type="textarea" :rows="3" placeholder="请描述本次沟通或更改内容..." />
+          </el-form-item>
+        </el-form>
+      </template>
+      <template v-else>
+        <el-alert type="success" :title="'已生成版本 ' + confirmVersion" show-icon style="margin-bottom:16px" />
+        <el-form>
+          <el-form-item label="确认链接">
+            <el-input :model-value="confirmLink" readonly>
+              <template #append>
+                <el-button @click="copyLink">复制</el-button>
+              </template>
+            </el-input>
+          </el-form-item>
+        </el-form>
+        <p style="color:#999;font-size:12px">客户打开此链接可查看工艺单并确认，无需登录。</p>
+      </template>
       <template #footer>
-        <el-button @click="showMarkDialog = false">取消</el-button>
-        <el-button type="primary" @click="confirmMarkVersion" :loading="markingVersion">确认</el-button>
+        <template v-if="!confirmLink">
+          <el-button @click="showMarkDialog = false">取消</el-button>
+          <el-button type="primary" @click="confirmMarkVersion" :loading="markingVersion">确认</el-button>
+        </template>
+        <template v-else>
+          <el-button type="primary" @click="showMarkDialog = false">完成</el-button>
+        </template>
+      </template>
+    </el-dialog>
+
+    <!-- 设置确认人对话框 -->
+    <el-dialog v-model="showConfirmUsersDialog" title="设置内部确认人" width="560px">
+      <p style="color:#666;margin-bottom:12px">选择需要确认本工艺单的用户，客户确认后将自动通知以下人员。</p>
+      <el-checkbox-group v-model="selectedConfirmUserIds">
+        <el-checkbox v-for="u in allUsers" :key="u.id" :label="u.id" style="display:flex;margin-bottom:8px">
+          {{ u.display_name || u.username }}
+          <el-tag size="small" style="margin-left:6px">{{ u.role }}</el-tag>
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="showConfirmUsersDialog = false">取消</el-button>
+        <el-button type="primary" :loading="savingConfirmUsers" @click="handleSaveConfirmUsers">保存</el-button>
       </template>
     </el-dialog>
 
@@ -399,56 +478,59 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion } from '../../api/processSheet'
+import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet } from '../../api/processSheet'
+import { useUserStore } from '../../store/user'
 import { listSpecs } from '../../api/spec'
+import { listUsers } from '../../api/user'
 import { listBasicData, getColorMapping } from '../../api/basicData'
 import { uploadImages } from '../../api/upload'
+import StatusLog from '../../components/StatusLog.vue'
 
 const route = useRoute()
+const userStore = useUserStore()
 const sheet = ref(null)
 const specs = ref([])
 const packagingTypes = ref([])
 const colorMapping = ref({})
 const loading = ref(false)
-const savingDetail = ref(false)
-const sheetLogs = computed(() => {
-  const logs = []
-  if (!sheet.value) return logs
-  logs.push({
-    time: sheet.value.created_at || '—',
-    action: '工艺单创建',
-    version: 'V0',
-    detail: `创建人: ${sheet.value.created_by || '—'}`,
-  })
-  if (sheet.value.version_marked) {
-    logs.push({
-      time: sheet.value.updated_at || '—',
-      action: '客户沟通标记',
-      version: formatVersion(sheet.value.confirm_version_no),
-      detail: `版本说明: ${sheet.value.version_note || '无'}`,
-    })
-  }
-  if (sheet.value.status === '保存' || sheet.value.status === '已下发') {
-    logs.push({
-      time: sheet.value.updated_at || '—',
-      action: '客户确认',
-      version: formatVersion(sheet.value.confirm_version_no),
-      detail: '客户已确认，版本锁定',
-    })
-  }
-  if (sheet.value.status === '已下发') {
-    logs.push({
-      time: sheet.value.updated_at || '—',
-      action: '工艺单下发',
-      version: formatVersion(sheet.value.confirm_version_no),
-      detail: '工艺单已发至车间',
-    })
-  }
-  return logs
+const loadingLogs = ref(false)
+const customerConfirmedFromLog = computed(() => {
+  return logs.value.filter(l => l.remark?.includes('客户确认'))
 })
+const commEvents = computed(() => {
+  return logs.value.filter(l => l.remark?.includes('客户沟通标记'))
+})
+
+const contractVersionMatch = computed(() => {
+  if (!sheet.value?.contract_snapshot?.latest_confirm_version) return null
+  const snapshotVer = Number(sheet.value.contract_snapshot.latest_confirm_version)
+  const currentVer = Number(sheet.value?.contract?.latest_confirm_version)
+  if (currentVer === undefined || isNaN(currentVer)) return null
+  return { snapshot: snapshotVer, current: currentVer, match: snapshotVer === currentVer }
+})
+const logs = ref([])
+
+const internalConfirmCount = computed(() => {
+  return sheet.value?.internal_confirmed_users?.length || 0
+})
+
+const canInternalConfirm = computed(() => {
+  return ['销售经理', '生产专员'].includes(userStore.role)
+})
+
+const canReopenEdit = computed(() => {
+  return ['销售经理', '生产专员'].includes(userStore.role)
+})
+
+async function loadLogs() {
+  try {
+    const res = await getSheetLogs(route.params.id)
+    logs.value = res.data
+  } catch { logs.value = [] }
+}
 
 // Items and detail data (reactive copies for editing)
 const items = ref([])
@@ -466,9 +548,17 @@ const subRefs = reactive({})
 const showMarkDialog = ref(false)
 const markNote = ref('')
 const markingVersion = ref(false)
+const confirmLink = ref('')
+const confirmVersion = ref('')
 const showChangeNoteDialog = ref(false)
 const changeNote = ref('')
 let changeNoteResolve = null
+
+// Confirm user management
+const showConfirmUsersDialog = ref(false)
+const allUsers = ref([])
+const selectedConfirmUserIds = ref([])
+const savingConfirmUsers = ref(false)
 
 function askChangeNote() {
   return new Promise((resolve) => {
@@ -487,7 +577,8 @@ function confirmChangeNote() {
 function formatVersion(v) {
   if (v === null || v === undefined || Number(v) === 0) return ''
   const num = Number(v)
-  return num % 1 === 0 ? `V${num}` : `V${num.toFixed(2)}`
+  if (num % 1 === 0) return `V${num}`
+  return `V${parseFloat(num.toFixed(2))}`
 }
 
 const accessoryGroups = [
@@ -654,7 +745,10 @@ async function onEmbossFileSelected(event) {
   if (!file || !activeItem.value) return
   try {
     const res = await uploadImages([file])
-    if (res.data?.[0]) activeItem.value.pressed_image = res.data[0].url
+    if (res.data?.[0]) {
+      activeItem.value.pressed_image = res.data[0].url
+      activeItem.value.pressed_image_name = res.data[0].original_name || file.name
+    }
   } catch { ElMessage.error('图片上传失败') }
   event.target.value = ''
 }
@@ -673,6 +767,10 @@ async function onAccFileSelected(key, event) {
     if (res.data?.length) {
       if (!detailData[`accessory_images_${key}`]) detailData[`accessory_images_${key}`] = []
       res.data.forEach(img => detailData[`accessory_images_${key}`].push(img.url))
+    }
+    // Auto-fill qty from contract item qty if empty
+    if (!detailData[`accessory_qty_${key}`] && activeItem.value?.qty) {
+      detailData[`accessory_qty_${key}`] = activeItem.value.qty
     }
   } catch { ElMessage.error('图片上传失败') }
   event.target.value = ''
@@ -702,6 +800,10 @@ async function onSubFileSelected(key, idx, event) {
         if (!arr[idx].images) arr[idx].images = []
         res.data.forEach(img => arr[idx].images.push(img.url))
       }
+      // Auto-fill qty from contract item qty if empty
+      if (arr?.[idx] && !arr[idx].qty && activeItem.value?.qty) {
+        arr[idx].qty = activeItem.value.qty
+      }
     }
   } catch { ElMessage.error('图片上传失败') }
   event.target.value = ''
@@ -723,7 +825,7 @@ function removeItem(index) {
   items.value.splice(index, 1)
 }
 
-function saveItemDetail() {
+async function saveItemDetail() {
   const item = activeItem.value
   if (!item) return
 
@@ -768,8 +870,52 @@ function saveItemDetail() {
     }
   }
 
-  ElMessage.success('保存成功')
-  showDetailDialog.value = false
+  // Fill accessory descriptions from group labels
+  for (const grp of accessoryGroups) {
+    const key = grp.key
+    const hasData = detailData[`accessory_size_${key}`] || detailData[`accessory_qty_${key}`] || detailData[`accessory_images_${key}`]?.length
+    if (hasData && !detailData[`accessory_desc_${key}`]) {
+      detailData[`accessory_desc_${key}`] = grp.label
+    }
+  }
+  // Persist to backend
+  try {
+    let change_note = undefined
+    if (sheet.value?.version_marked) {
+      change_note = await askChangeNote()
+    }
+    const payload = {
+      detail_data: { ...detailData },
+      items: items.value.map(i => ({
+        id: i.id,
+        is_pressed: i.is_pressed,
+        packaging_type: i.packaging_type || '',
+        delivery_date: i.delivery_date,
+        pattern_count: i.pattern_count || 0,
+        pattern_data: i.pattern_data || [],
+        pattern_code: i.pattern_code || '',
+        color_a: i.color_a || '',
+        image_a_1: i.image_a_1 || '',
+        image_a_2: i.image_a_2 || '',
+        image_a_3: i.image_a_3 || '',
+        color_b: i.color_b || '',
+        image_b_1: i.image_b_1 || '',
+        image_b_2: i.image_b_2 || '',
+        image_b_3: i.image_b_3 || '',
+        pressed_image: i.pressed_image || '',
+        pressed_image_name: i.pressed_image_name || '',
+        process_remark: i.process_remark || '',
+        remark: i.remark || '',
+        qty: i.qty,
+      })),
+      change_note,
+    }
+    await updateSheetDetail(route.params.id, payload)
+    ElMessage.success('保存成功')
+    showDetailDialog.value = false
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '保存失败')
+  }
 }
 
 // --- Sheet operations ---
@@ -777,22 +923,39 @@ async function confirmMarkVersion() {
   markingVersion.value = true
   try {
     const res = await markVersion(route.params.id, { note: markNote.value })
-    const v = formatVersion(res.data.confirm_version_no)
-    if (v) {
-      ElMessage.success(`已生成版本 ${v}，开始客户沟通`)
-    } else {
-      ElMessage.success('已标记客户沟通')
-    }
-    showMarkDialog.value = false
+    confirmVersion.value = formatVersion(res.data.confirm_version_no)
+
+    // Generate confirm link
+    const linkRes = await generateConfirmLink(route.params.id)
+    const origin = window.location.origin
+    confirmLink.value = `${origin}/confirm/${linkRes.data.token}`
+    copyLink()
+
     loadData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
   finally { markingVersion.value = false }
 }
 
+function copyLink() {
+  navigator.clipboard.writeText(confirmLink.value)
+  ElMessage.success('确认链接已复制到剪贴板')
+}
+
 async function handleConfirm() {
   // First save the current detail data, then confirm
-  savingDetail.value = true
   try {
+    let change_note = undefined
+    if (sheet.value?.version_marked) {
+      change_note = await askChangeNote()
+    }
+    // Fill accessory descriptions from group labels
+    for (const grp of accessoryGroups) {
+      const key = grp.key
+      const hasData = detailData[`accessory_size_${key}`] || detailData[`accessory_qty_${key}`] || detailData[`accessory_images_${key}`]?.length
+      if (hasData && !detailData[`accessory_desc_${key}`]) {
+        detailData[`accessory_desc_${key}`] = grp.label
+      }
+    }
     const payload = {
       detail_data: { ...detailData },
       items: items.value.map(item => ({
@@ -812,8 +975,11 @@ async function handleConfirm() {
         image_b_2: item.image_b_2 || '',
         image_b_3: item.image_b_3 || '',
         pressed_image: item.pressed_image || '',
+        process_remark: item.process_remark || '',
         remark: item.remark || '',
+        qty: item.qty,
       })),
+      change_note,
     }
     await updateSheetDetail(route.params.id, payload)
 
@@ -822,7 +988,6 @@ async function handleConfirm() {
     ElMessage.success(`客户已确认，正式版本 ${formatVersion(res.data.confirm_version_no)}`)
     loadData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
-  finally { savingDetail.value = false }
 }
 
 async function handleDispatch() {
@@ -833,47 +998,63 @@ async function handleDispatch() {
   } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
 }
 
-async function handleSaveDetail() {
-  // If version is marked, ask for change reason first
-  let note = ''
-  if (sheet.value?.version_marked) {
-    note = await askChangeNote()
-    if (!note?.trim()) return
-  }
-
-  savingDetail.value = true
+async function handleInternalConfirm() {
   try {
-    const payload = {
-      detail_data: { ...detailData },
-      items: items.value.map(item => ({
-        id: item.id,
-        is_pressed: item.is_pressed,
-        packaging_type: item.packaging_type || '',
-        delivery_date: item.delivery_date,
-        pattern_count: item.pattern_count || 0,
-        pattern_data: item.pattern_data || [],
-        pattern_code: item.pattern_code || '',
-        color_a: item.color_a || '',
-        image_a_1: item.image_a_1 || '',
-        image_a_2: item.image_a_2 || '',
-        image_a_3: item.image_a_3 || '',
-        color_b: item.color_b || '',
-        image_b_1: item.image_b_1 || '',
-        image_b_2: item.image_b_2 || '',
-        image_b_3: item.image_b_3 || '',
-        pressed_image: item.pressed_image || '',
-        remark: item.remark || '',
-      })),
-      change_note: note || undefined,
-    }
-    await updateSheetDetail(route.params.id, payload)
-    ElMessage.success('工艺详情已保存')
+    await internalConfirmSheet(route.params.id)
+    ElMessage.success('内部确认成功')
     loadData()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '保存失败')
-  } finally {
-    savingDetail.value = false
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+}
+
+async function handleReopenEdit() {
+  try {
+    await reopenSheetEdit(route.params.id)
+    ElMessage.success('已重新打开编辑')
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+}
+
+async function handleOpenConfirmUsers() {
+  try {
+    if (!allUsers.value.length) {
+      const res = await listUsers()
+      allUsers.value = res.data
+    }
+    selectedConfirmUserIds.value = [...(sheet.value?.confirm_user_ids || [])]
+    showConfirmUsersDialog.value = true
+  } catch { ElMessage.error('加载用户列表失败') }
+}
+
+async function handleSaveConfirmUsers() {
+  savingConfirmUsers.value = true
+  try {
+    await setConfirmUsers(route.params.id, selectedConfirmUserIds.value)
+    ElMessage.success('确认人设置已保存')
+    showConfirmUsersDialog.value = false
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '保存失败') }
+  finally { savingConfirmUsers.value = false }
+}
+
+watch(showConfirmUsersDialog, (val) => {
+  if (!val) return
+  if (!allUsers.value.length) {
+    listUsers().then(res => { allUsers.value = res.data }).catch(() => {})
   }
+  selectedConfirmUserIds.value = [...(sheet.value?.confirm_user_ids || [])]
+})
+
+async function handlePrint() {
+  try {
+    const res = await printSheet(route.params.id)
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${sheet.value?.sheet_no || 'process-sheet'}.pdf`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) { ElMessage.error('打印失败') }
 }
 
 async function loadData() {
@@ -934,8 +1115,18 @@ async function loadData() {
       emboss_model: dd.emboss_model || '',
     })
   } catch { ElMessage.error('加载失败') }
-  finally { loading.value = false }
+  finally {
+    loading.value = false
+    loadLogs()
+  }
 }
+
+watch(showMarkDialog, (val) => {
+  if (val) {
+    confirmLink.value = ''
+    confirmVersion.value = ''
+  }
+})
 
 onMounted(async () => {
   try {
@@ -948,6 +1139,7 @@ onMounted(async () => {
     packagingTypes.value = ptRes.data || []
     colorMapping.value = cmRes.data || {}
   } catch {}
-  loadData()
+  await loadData()
+  loadLogs()
 })
 </script>

@@ -104,7 +104,7 @@ class ContractItemOut(BaseModel):
     process_sheet_id: Optional[int] = None
     process_sheet_no: Optional[str] = None
     process_sheet_status: Optional[str] = None
-    process_sheet_version: Optional[int] = 0
+    process_sheet_version: Optional[float] = 0
 
     class Config:
         from_attributes = True

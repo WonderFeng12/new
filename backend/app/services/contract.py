@@ -218,6 +218,20 @@ def create_contract(db: Session, data: ContractCreate, username: str):
     contract.total_amount = total
     db.commit()
     db.refresh(contract)
+
+    # Add production log for contract creation
+    from app.models.production_log import ProductionLog
+    log = ProductionLog(
+        contract_id=contract.id,
+        from_status=None,
+        to_status="草稿",
+        operation_type="创建",
+        operator_id=None,
+        remark=f"合同已创建（{contract.contract_no}），共{len(items_data)}个行项目",
+    )
+    db.add(log)
+    db.commit()
+
     return get_contract(db, contract.id)
 
 
@@ -235,6 +249,82 @@ def _can_edit_confirmed(db: Session, role: str) -> bool:
         return role in allowed
     except (json.JSONDecodeError, TypeError):
         return False
+
+
+def _build_change_summary(db: Session, contract: Contract, old_data: dict,
+                          old_items: list, items_data: list | None) -> str | None:
+    """Compare old and new contract data, return a human-readable change summary."""
+    from app.models.spec import Spec
+
+    changes = []
+
+    field_labels = {
+        "binding_material": "包边材料", "binding_width": "包边宽度",
+        "binding_color_no": "色号", "emboss_model": "压花型号",
+        "delivery_date": "交货日期",
+    }
+    for field, label in field_labels.items():
+        old_val = old_data.get(field)
+        new_val = getattr(contract, field, None)
+        if str(old_val or "") != str(new_val or ""):
+            changes.append(f"{label}({old_val or '空'}→{new_val or '空'})")
+
+    for i in range(1, 11):
+        f = f"tech_note_{i}"
+        if str(old_data.get(f, "") or "") != str(getattr(contract, f, "") or ""):
+            changes.append(f"技术说明{i}")
+    for i in range(1, 6):
+        f = f"pack_note_{i}"
+        if str(old_data.get(f, "") or "") != str(getattr(contract, f, "") or ""):
+            changes.append(f"包装说明{i}")
+    for i in range(1, 4):
+        f = f"box_note_{i}"
+        if str(old_data.get(f, "") or "") != str(getattr(contract, f, "") or ""):
+            changes.append(f"箱单说明{i}")
+
+    # Item-level changes
+    old_map = {str(it["id"]): it for it in old_items if it["id"]}
+    if items_data:
+        for new_it in items_data:
+            new_id = str(new_it.get("id")) if new_it.get("id") else None
+            if new_id and new_id in old_map:
+                old_it = old_map[new_id]
+                ln = new_it.get("line_no", "?")
+                item_changes = []
+                if str(old_it.get("packaging_type", "") or "") != str(new_it.get("packaging_type", "") or ""):
+                    item_changes.append(f"包装方式({old_it.get('packaging_type') or '空'}→{new_it.get('packaging_type') or '空'})")
+                old_qty = float(old_it.get("qty") or 0)
+                new_qty = float(new_it.get("qty") or 0)
+                if old_qty != new_qty:
+                    item_changes.append(f"数量({old_qty}→{new_qty})")
+                if bool(old_it.get("is_pressed", False)) != bool(new_it.get("is_pressed", False)):
+                    old_p = '是' if old_it.get('is_pressed') else '否'
+                    new_p = '是' if new_it.get('is_pressed') else '否'
+                    item_changes.append(f"压花({old_p}→{new_p})")
+                if str(old_it.get("delivery_date") or "") != str(new_it.get("delivery_date") or ""):
+                    item_changes.append("交货日期")
+                if old_it.get("spec_id") != new_it.get("spec_id"):
+                    old_spec = old_it.get("spec") or db.query(Spec).filter(Spec.id == old_it["spec_id"]).first()
+                    new_spec = db.query(Spec).filter(Spec.id == new_it.get("spec_id")).first()
+                    item_changes.append(f"规格({old_spec.spec_name if old_spec else '?'}→{new_spec.spec_name if new_spec else '?'})")
+                if item_changes:
+                    changes.append(f"行项目{ln}# {'，'.join(item_changes)}")
+            else:
+                changes.append(f"行项目#{new_it.get('line_no', '?')} 新增")
+
+        old_ids = set(it["id"] for it in old_items if it["id"])
+        new_ids = set(it.get("id") for it in items_data if it.get("id"))
+        for did in old_ids - new_ids:
+            dit = next((it for it in old_items if it["id"] == did), None)
+            if dit:
+                changes.append(f"行项目#{dit['line_no']} 已删除")
+
+    if not changes:
+        return None
+    summary = "修改了：\n" + "\n".join(changes)
+    if len(summary) > 500:
+        summary = summary[:497] + "..."
+    return summary
 
 
 def update_contract(db: Session, id: int, data: ContractUpdate, username: str, user_role: str = ""):
@@ -256,6 +346,35 @@ def update_contract(db: Session, id: int, data: ContractUpdate, username: str, u
 
     items_data = data.model_dump(exclude_unset=True).pop("items", None)
     original_status = contract.status
+
+    # Snapshot old values for change summary
+    old_data = {
+        "binding_material": contract.binding_material,
+        "binding_width": contract.binding_width,
+        "binding_color_no": contract.binding_color_no,
+        "emboss_model": contract.emboss_model,
+        "delivery_date": str(contract.delivery_date) if contract.delivery_date else None,
+    }
+    for i in range(1, 11):
+        old_data[f"tech_note_{i}"] = getattr(contract, f"tech_note_{i}", "")
+    for i in range(1, 6):
+        old_data[f"pack_note_{i}"] = getattr(contract, f"pack_note_{i}", "")
+    for i in range(1, 4):
+        old_data[f"box_note_{i}"] = getattr(contract, f"box_note_{i}", "")
+    old_items = [
+        {
+            "id": it.id,
+            "line_no": it.line_no,
+            "spec_id": it.spec_id,
+            "packaging_type": it.packaging_type,
+            "qty": it.qty,
+            "is_pressed": it.is_pressed,
+            "delivery_date": str(it.delivery_date) if it.delivery_date else None,
+            "spec": db.query(Spec).filter(Spec.id == it.spec_id).first(),
+        }
+        for it in contract.items
+    ]
+
     for field, value in data.model_dump(exclude_unset=True, exclude={"items"}).items():
         setattr(contract, field, value)
 
@@ -318,16 +437,19 @@ def update_contract(db: Session, id: int, data: ContractUpdate, username: str, u
                 db.delete(existing)
         contract.total_amount = total
 
-    # Log edits on non-草稿 contracts
-    if original_status != "草稿":
+    # Log edits with change summary
+    change_summary = _build_change_summary(
+        db, contract, old_data, old_items, items_data,
+    )
+    if change_summary:
         from app.models.production_log import ProductionLog
         log = ProductionLog(
             contract_id=contract.id,
             from_status=original_status,
             to_status=contract.status,
-            operation_type="重新编辑",
+            operation_type="修改",
             operator_id=None,
-            remark=f"合同已修改（由{username}操作）",
+            remark=change_summary,
         )
         db.add(log)
 
@@ -371,8 +493,7 @@ def manual_confirm_contract(db: Session, contract_id: int, user_id: int, remark:
     old_status = contract.status
     contract.status = "确认"
     contract.updated_by = user.display_name or user.username
-    if not contract.latest_confirm_version:
-        contract.latest_confirm_version = 1
+    contract.latest_confirm_version = (contract.latest_confirm_version or 0) + 1
 
     log = ProductionLog(
         contract_id=contract.id,
@@ -380,7 +501,7 @@ def manual_confirm_contract(db: Session, contract_id: int, user_id: int, remark:
         to_status="确认",
         operation_type="确认",
         operator_id=user.id,
-        remark=f"手动确认: {remark}" if remark else "手动确认",
+        remark=f"手动确认，版本 V{contract.latest_confirm_version}" + (f"：{remark}" if remark else ""),
     )
     db.add(log)
     db.commit()
@@ -418,16 +539,16 @@ def reopen_edit(db: Session, contract_id: int, user_id: int):
     if user.role not in ("销售经理", "生产专员"):
         raise HTTPException(status_code=403, detail="权限不足")
 
-    new_version = (contract.latest_confirm_version or 0) + 1
-    contract.latest_confirm_version = new_version
+    original_status = contract.status
+    contract.status = "草稿"
 
     log = ProductionLog(
         contract_id=contract.id,
-        from_status=contract.status,
+        from_status=original_status,
         to_status=contract.status,
         operation_type="重新编辑",
         operator_id=user_id,
-        remark=f"合同重新编辑(V{new_version})，由{user.display_name}操作",
+        remark=f"重新打开编辑（由{user.display_name}操作）",
     )
     db.add(log)
     db.commit()

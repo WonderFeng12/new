@@ -28,6 +28,7 @@ class ProcessSheetItem(Base):
     image_b_2 = Column(String(500))
     image_b_3 = Column(String(500))
     pressed_image = Column(String(500))
+    pressed_image_name = Column(String(200), comment="压花图片原始文件名")
     remark = Column(Text)
     process_remark = Column(Text, comment="工艺备注（下推时填写）")
     qty = Column(DECIMAL(12, 2), default=0, comment="数量（从合同行项目带入）")

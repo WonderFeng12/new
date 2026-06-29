@@ -139,7 +139,7 @@ async function fetchData() {
 function search() { page.value = 1; fetchData() }
 function openCreate() { router.push('/contracts/new') }
 function openEdit(row) { router.push(`/contracts/${row.id}/edit`) }
-function viewDetail(row) { router.push(`/contracts/${row.id}`) }
+function viewDetail(row) { router.push(`/contracts/${row._contract?.id ?? row.id}`) }
 async function handleDelete(row) {
   try {
     await deleteContract(row.id)

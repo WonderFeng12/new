@@ -31,6 +31,7 @@ class ProcessSheetItemOut(BaseModel):
     image_b_2: Optional[str] = None
     image_b_3: Optional[str] = None
     pressed_image: Optional[str] = None
+    pressed_image_name: Optional[str] = None
     remark: Optional[str] = None
     process_remark: Optional[str] = None
     qty: Optional[float] = 0
@@ -84,8 +85,12 @@ class ProcessSheetOut(BaseModel):
     status: str = "草稿"
     confirm_token: Optional[str] = None
     customer_comment: Optional[str] = None
+    customer_confirmed: bool = False
     version_marked: Optional[bool] = False
     version_note: Optional[str] = None
+    internal_confirm_required: int = 1
+    internal_confirmed_users: Optional[list] = []
+    confirm_user_ids: Optional[list] = []
     detail_data: Optional[Any] = None
     contract: Optional[ContractOut] = None
     contract_snapshot: Optional[Any] = None

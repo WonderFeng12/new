@@ -254,7 +254,16 @@ def cancel_item(
     old_status = item.production_status
     item.production_status = "cancelled"
     item.cancel_reason = reason
-    item.cancel_quantities = quantities
+    # Save snapshot for restore capability
+    snapshot = dict(quantities or {})
+    snapshot.update({
+        "contract_version": item.contract.latest_confirm_version,
+        "contract_status": item.contract.status,
+        "production_status": old_status,
+        "detail": reason,
+        "restored": False,
+    })
+    item.cancel_quantities = snapshot
     db.flush()
 
     log = ProductionLog(
@@ -281,6 +290,43 @@ def cancel_item(
     except Exception as e:
         logger.warning(f"通知发送失败（不影响业务）: {e}")
 
+    return item, log
+
+
+def restore_item(db: Session, item_id: int, user_id: int):
+    """Restore a cancelled contract item to its pre-cancel state."""
+    item = db.query(ContractItem).options(
+        joinedload(ContractItem.contract)
+    ).filter(ContractItem.id == item_id).first()
+    if not item or item.contract.is_deleted:
+        raise HTTPException(status_code=404, detail="行项目不存在")
+
+    snapshot = item.cancel_quantities
+    if not snapshot or snapshot.get("restored"):
+        raise HTTPException(status_code=400, detail="无可恢复的取消记录")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # Restore production status
+    item.production_status = snapshot.get("production_status")
+    item.cancel_reason = None
+    snapshot["restored"] = True
+    item.cancel_quantities = snapshot
+
+    log = ProductionLog(
+        contract_id=item.contract_id,
+        contract_item_id=item.id,
+        from_status="cancelled",
+        to_status=snapshot.get("production_status"),
+        operation_type="取消",
+        operator_id=user_id,
+        remark="已恢复取消：行项目恢复到取消前状态",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(item)
     return item, log
 
 
@@ -407,7 +453,7 @@ def push_down_item_to_process_sheet(db: Session, item_id: int, user_id: int, pro
     sheet = ProcessSheet(
         contract_id=contract.id,
         sheet_no=f"{prefix}-{count + 1:03d}",
-        confirm_version_no=contract.latest_confirm_version or 0,
+        confirm_version_no=0,  # 工艺单独立版本体系，初始 V0
         status="草稿",
         created_by=contract.updated_by or contract.created_by,
         updated_by=contract.updated_by or contract.created_by,

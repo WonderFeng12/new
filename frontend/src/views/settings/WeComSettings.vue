@@ -48,6 +48,22 @@
       </div>
     </el-card>
 
+    <el-card v-loading="loading" style="max-width:800px;margin-top:16px">
+      <template #header>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span>工艺单内部确认人默认设置</span>
+          <el-button type="primary" size="small" :loading="savingDefaultConfirm" @click="handleSaveDefaultConfirm">保存</el-button>
+        </div>
+      </template>
+      <p style="color:#666;margin-bottom:12px">客户确认工艺单后，将自动通知以下人员（新建工艺单时默认继承此配置）：</p>
+      <el-checkbox-group v-model="defaultConfirmUserIds">
+        <el-checkbox v-for="u in allUsers" :key="u.id" :label="u.id" style="display:flex;margin-bottom:8px">
+          {{ u.display_name || u.username }}
+          <el-tag size="small" style="margin-left:6px">{{ u.role }}</el-tag>
+        </el-checkbox>
+      </el-checkbox-group>
+    </el-card>
+
     <!-- Create/Edit dialog -->
     <el-dialog v-model="formVisible" :title="isEditing ? '编辑 Webhook' : '新增 Webhook'" width="550px">
       <el-form :model="form" label-width="110px">
@@ -81,6 +97,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { listWebhooks, createWebhook, updateWebhook, deleteWebhook } from '../../api/webhookConfig'
+import { getDefaultConfirmUsers, setDefaultConfirmUsers } from '../../api/production'
+import { listUsers } from '../../api/user'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
@@ -90,6 +108,11 @@ const isEditing = ref(false)
 const saving = ref(false)
 const editId = ref(null)
 const form = ref({ name: '', customName: '', webhook_url: '', is_enabled: true })
+
+// Default confirm users
+const allUsers = ref([])
+const defaultConfirmUserIds = ref([])
+const savingDefaultConfirm = ref(false)
 
 function openCreate() {
   isEditing.value = false
@@ -146,11 +169,31 @@ async function handleDelete(row) {
   } catch (e) { ElMessage.error(e.response?.data?.detail || '删除失败') }
 }
 
+async function loadDefaultConfirmUsers() {
+  try {
+    const [usersRes, configRes] = await Promise.all([listUsers(), getDefaultConfirmUsers()])
+    allUsers.value = usersRes.data
+    defaultConfirmUserIds.value = configRes.data.user_ids || []
+  } catch { ElMessage.error('加载确认人配置失败') }
+}
+
+async function handleSaveDefaultConfirm() {
+  savingDefaultConfirm.value = true
+  try {
+    await setDefaultConfirmUsers({ user_ids: defaultConfirmUserIds.value })
+    ElMessage.success('已保存')
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '保存失败') }
+  finally { savingDefaultConfirm.value = false }
+}
+
 async function loadData() {
   loading.value = true
   try {
-    const res = await listWebhooks()
-    webhooks.value = res.data
+    const [webhookRes] = await Promise.all([
+      listWebhooks(),
+      loadDefaultConfirmUsers(),
+    ])
+    webhooks.value = webhookRes.data
   } catch { ElMessage.error('加载失败') }
   finally { loading.value = false }
 }

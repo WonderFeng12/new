@@ -49,7 +49,18 @@
       "mcp__plugin_playwright_playwright__browser_evaluate",
       "mcp__plugin_playwright_playwright__browser_wait_for",
       "Bash(awk '{print $2}')",
-      "Bash(xargs -I{} kill {})"
+      "Bash(xargs -I{} kill {})",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" status)",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" diff --stat)",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" log --oneline -5)",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" add backend/app/services/spec.py frontend/src/views/spec/SpecList.vue)",
+      "Bash(git -C '/Users/wonderfeng/claude/new system' commit -m ' *)",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" add frontend/src/views/spec/SpecList.vue)",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" add backend/app/services/customer.py backend/app/schemas/customer.py frontend/src/views/customer/CustomerList.vue)",
+      "Bash(git -C \"/Users/wonderfeng/claude/new system\" add CLAUDE.md .claude/agents/contract-tester.md)",
+      "Read(//Users/wonderfeng/claude/quick_setup/**)",
+      "Bash(sed -n '305p' \"/Users/wonderfeng/claude/new system/CLAUDE.md\")",
+      "Skill(claude-md-management:revise-claude-md)"
     ]
   }
 }

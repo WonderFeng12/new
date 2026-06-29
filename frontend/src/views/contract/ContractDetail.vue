@@ -23,7 +23,7 @@
       </el-descriptions>
 
       <el-divider>行项目</el-divider>
-      <el-table :data="contract?.items || []" stripe size="small">
+      <el-table :data="contract?.items || []" stripe size="small" :row-class-name="itemRowClass">
         <el-table-column type="expand" width="30">
           <template #default="{ row }">
             <div style="padding:8px 16px;font-size:13px">
@@ -79,24 +79,18 @@
             <el-button size="small" v-if="canReleaseYarn(row)" @click="openYarnDialog(row)">下达坯布</el-button>
             <el-button size="small" type="primary" v-if="canAdvance(row)" @click="openAdvanceDialog(row)">推进</el-button>
             <el-button size="small" v-if="canRollback(row)" @click="openRollbackDialog(row)">回退</el-button>
-            <el-button size="small" @click="openLogDialog(row)">日志</el-button>
             <el-button size="small" type="primary" v-if="canPushDown(row)" @click="handlePushDownItem(row)">下推工艺单</el-button>
+            <el-button size="small" type="warning" v-if="canRestore(row)" @click="handleRestore(row)">恢复</el-button>
             <el-button size="small" type="danger" v-if="canCancel(row)" @click="openCancelDialog(row)">取消</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <el-divider>状态日志</el-divider>
-      <el-table :data="contractLogs" stripe size="small" v-if="contractLogs.length">
-        <el-table-column prop="created_at" label="时间" width="160" />
-        <el-table-column prop="operation_type" label="操作" width="100" />
-        <el-table-column prop="contract_item_id" label="行号" width="60" />
-        <el-table-column prop="from_status" label="从" width="100" />
-        <el-table-column prop="to_status" label="到" width="100" />
-        <el-table-column prop="operator_name" label="操作人" width="100" />
-        <el-table-column prop="remark" label="备注" min-width="150" />
-      </el-table>
-      <div v-else style="color:#999;text-align:center;padding:16px">暂无日志</div>
+      <StatusLog
+        :logs="contractLogs"
+        :loading="loading"
+      />
     </el-card>
 
     <!-- 推进 dialog -->
@@ -121,6 +115,10 @@
     <el-dialog v-model="manualConfirmDialogVisible" title="确认合同" width="420px">
       <el-form>
         <el-form-item label="合同号">{{ contract?.contract_no }}</el-form-item>
+        <el-form-item label="确认版本">
+          <el-tag type="warning">V{{ nextVersion }}</el-tag>
+          <span style="margin-left:8px;color:#999">确认后版本将变为 V{{ nextVersion }}</span>
+        </el-form-item>
         <el-form-item label="确认意见" required>
           <el-input v-model="manualConfirmRemark" type="textarea" :rows="3" placeholder="请填写确认意见（必填）" />
         </el-form-item>
@@ -178,20 +176,6 @@
       </template>
     </el-dialog>
 
-    <!-- 日志 dialog -->
-    <el-dialog v-model="logDialogVisible" title="状态日志" width="700px">
-      <el-table :data="dialogLogs" stripe size="small" v-loading="dialogLoading">
-        <el-table-column prop="created_at" label="时间" width="160" />
-        <el-table-column prop="operation_type" label="操作" width="100" />
-        <el-table-column prop="from_status" label="从" width="100" />
-        <el-table-column prop="to_status" label="到" width="100" />
-        <el-table-column prop="operator_name" label="操作人" width="100" />
-        <el-table-column prop="remark" label="备注" min-width="150" />
-      </el-table>
-      <template #footer>
-        <el-button @click="logDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -200,8 +184,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getContract, manualConfirm, requestConfirm, reopenEdit } from '../../api/contract'
-import { listProcessSteps, advanceItem, rollbackItem, cancelItem, releaseYarnPlan, getItemLogs, getContractLogs, pushDownItem } from '../../api/production'
+import { listProcessSteps, advanceItem, rollbackItem, cancelItem, restoreItem, releaseYarnPlan, getContractLogs, pushDownItem } from '../../api/production'
 import { listUsers } from '../../api/user'
+import StatusLog from '../../components/StatusLog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -217,12 +202,10 @@ const advanceDialogVisible = ref(false)
 const rollbackDialogVisible = ref(false)
 const cancelDialogVisible = ref(false)
 const yarnDialogVisible = ref(false)
-const logDialogVisible = ref(false)
 const currentItem = ref(null)
 const cancelQty = ref(0)
 const cancelReason = ref('')
 const selectedUserId = ref(null)
-const dialogLogs = ref([])
 const dialogLoading = ref(false)
 
 const manualConfirmDialogVisible = ref(false)
@@ -249,6 +232,10 @@ const currentUserId = computed(() => {
   } catch { return null }
 })
 
+const nextVersion = computed(() => {
+  return (contract.value?.latest_confirm_version || 0) + 1
+})
+
 const progressSummary = computed(() => {
   const items = contract.value?.items || []
   const total = items.length
@@ -265,6 +252,10 @@ const stepNameMap = computed(() => {
   }
   return map
 })
+
+function itemRowClass({ row }) {
+  if (row.production_status === 'cancelled') return 'cancelled-row'
+}
 
 function statusType(s) {
   if (s === '草稿') return 'warning'
@@ -287,6 +278,7 @@ function statusLabel(code) {
 }
 
 function canReleaseYarn(row) {
+  if (row.production_status === 'cancelled') return false
   const role = userRole.value
   if (contract.value?.status === '草稿') return false
   return (role === '销售经理' || role === '生产专员') && !row.production_status
@@ -297,7 +289,6 @@ function canAdvance(row) {
   if (row.production_status === 'cancelled' || row.production_status === 'completed') return false
   const role = userRole.value
   if (role === '销售经理' || role === '生产专员') return true
-  // 外协人员只能推进织造工序
   if (role === '外协人员' && row.production_status === 'weaving') return true
   return false
 }
@@ -312,7 +303,13 @@ function canCancel(row) {
   return (role === '销售经理' || role === '生产专员' || role === '业务员') && row.production_status !== 'cancelled'
 }
 
+function canRestore(row) {
+  const role = userRole.value
+  return (role === '销售经理' || role === '生产专员') && row.production_status === 'cancelled'
+}
+
 function canPushDown(row) {
+  if (row.production_status === 'cancelled') return false
   const role = userRole.value
   if (role !== '销售经理' && role !== '生产专员') return false
   if (contract.value?.status !== '确认' && contract.value?.status !== '已下发') return false
@@ -354,6 +351,14 @@ async function confirmPushDown() {
     }
   } catch (e) { ElMessage.error(e.response?.data?.detail || '下推失败') }
   finally { dialogLoading.value = false }
+}
+
+async function handleRestore(row) {
+  try {
+    await restoreItem(row.id)
+    ElMessage.success('已恢复取消')
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '恢复失败') }
 }
 
 // --- Dialogs ---
@@ -429,18 +434,6 @@ async function confirmYarn() {
   finally { dialogLoading.value = false }
 }
 
-async function openLogDialog(row) {
-  currentItem.value = row
-  logDialogVisible.value = true
-  dialogLoading.value = true
-  dialogLogs.value = []
-  try {
-    const res = await getItemLogs(row.id)
-    dialogLogs.value = res.data
-  } catch (e) { ElMessage.error(e.response?.data?.detail || '加载日志失败') }
-  finally { dialogLoading.value = false }
-}
-
 async function handleManualConfirm() {
   if (!manualConfirmRemark.value?.trim()) {
     ElMessage.warning('请填写确认意见')
@@ -471,9 +464,20 @@ async function loadData() {
     processSteps.value = sRes.data
     users.value = uRes.data
     contractLogs.value = lRes.data
-  } catch { ElMessage.error('加载失败') }
+  } catch (e) {
+    console.error('ContractDetail loadData error:', e)
+    console.error('Response:', e.response)
+    ElMessage.error(e.response?.data?.detail || '加载失败')
+  }
   finally { loading.value = false }
 }
 
 onMounted(loadData)
 </script>
+
+<style>
+.el-table .cancelled-row,
+.el-table .cancelled-row td.el-table__cell {
+  color: #f56c6c;
+}
+</style>
