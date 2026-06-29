@@ -18,17 +18,10 @@
         </div>
       </template>
 
-      <!-- 版本过期警告：对比下推时的合同版本与当前合同版本 -->
-      <el-alert v-if="sheet && (snapshotContractVersion || 0) > 0 && (snapshotContractVersion || 0) < (sheet.contract?.latest_confirm_version || 0)" title="合同已更新" type="warning" show-icon :closable="false" style="margin-bottom:16px">
-        <template #default>
-          合同 {{ sheet.contract.contract_no }} 已有新版本(V{{ sheet.contract.latest_confirm_version }})，
-          当前工艺单基于 V{{ snapshotContractVersion }}，建议重新生成工艺单。
-          <el-link type="warning" :underline="false" style="margin-left:8px" @click="$router.push(`/contracts/${sheet.contract.id}`)">查看合同</el-link>
-        </template>
-      </el-alert>
-
       <el-descriptions :column="3" border>
-        <el-descriptions-item label="合同号">{{ sheet?.contract?.contract_no }}</el-descriptions-item>
+        <el-descriptions-item label="合同号">
+          <el-link type="primary" @click="$router.push(`/contracts/${sheet?.contract?.id}`)">{{ sheet?.contract?.contract_no }}</el-link>
+        </el-descriptions-item>
         <el-descriptions-item label="客户">{{ sheet?.contract?.customer?.name }}</el-descriptions-item>
         <el-descriptions-item v-if="formatVersion(sheet?.confirm_version_no)" label="工艺单版本">
           {{ formatVersion(sheet?.confirm_version_no) }}
@@ -79,37 +72,34 @@
         </el-table-column>
       </el-table>
 
-      <el-divider>版本信息</el-divider>
+      <el-divider>版本历史</el-divider>
       <div style="margin-bottom:16px">
-        <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="工艺单版本">
-            <el-tag size="small" :type="formatVersion(sheet?.confirm_version_no) ? 'primary' : 'info'">
-              {{ formatVersion(sheet?.confirm_version_no) || '未开始' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="沟通标记">
-            <el-tag v-if="sheet?.version_marked" size="small" type="warning">沟通中</el-tag>
-            <span v-else style="color:#999">—</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="版本说明">{{ sheet?.version_note || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="创建人">{{ sheet?.created_by || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ sheet?.created_at || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="更新时间">{{ sheet?.updated_at || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="状态">{{ sheet?.status || '—' }}</el-descriptions-item>
-        </el-descriptions>
+        <el-timeline>
+          <el-timeline-item timestamp="工艺单创建" :timestamp="sheet?.created_at || '—'" type="primary" size="large">
+            <p style="margin:0">创建人: {{ sheet?.created_by || '—' }}</p>
+            <p style="margin:0;font-size:12px;color:#999">版本 V0</p>
+          </el-timeline-item>
+          <el-timeline-item v-if="sheet?.version_marked" timestamp="客户沟通标记" :timestamp="sheet?.updated_at || '—'" type="warning" size="large">
+            <p style="margin:0">当前版本: <strong>{{ formatVersion(sheet?.confirm_version_no) }}</strong></p>
+            <p v-if="sheet?.version_note" style="margin:0;font-size:12px;color:#666">说明: {{ sheet?.version_note }}</p>
+          </el-timeline-item>
+          <el-timeline-item v-if="sheet?.status === '保存' || sheet?.status === '已下发'" timestamp="客户已确认，版本锁定" :timestamp="sheet?.updated_at || '—'" type="success" size="large">
+            <p style="margin:0">正式版本: <strong>{{ formatVersion(sheet?.confirm_version_no) }}</strong></p>
+          </el-timeline-item>
+          <el-timeline-item v-if="sheet?.status === '已下发'" timestamp="工艺单已下发" :timestamp="sheet?.updated_at || '—'" type="primary" size="large">
+            <p style="margin:0;font-size:12px;color:#999">工艺单发至车间</p>
+          </el-timeline-item>
+        </el-timeline>
       </div>
 
       <el-divider>操作日志</el-divider>
-      <el-table :data="contractLogs" stripe size="small" v-if="contractLogs.length" v-loading="logsLoading">
-        <el-table-column prop="created_at" label="时间" width="160" />
-        <el-table-column prop="operation_type" label="操作" width="100" />
-        <el-table-column prop="contract_item_id" label="行项目ID" width="80" />
-        <el-table-column prop="from_status" label="从" width="110" />
-        <el-table-column prop="to_status" label="到" width="110" />
-        <el-table-column prop="operator_name" label="操作人" width="100" />
-        <el-table-column prop="remark" label="备注" min-width="160" />
+      <el-table :data="sheetLogs" stripe size="small" v-if="sheetLogs.length">
+        <el-table-column prop="time" label="时间" width="160" />
+        <el-table-column prop="action" label="操作" width="120" />
+        <el-table-column prop="version" label="版本" width="100" />
+        <el-table-column prop="detail" label="说明" min-width="200" />
       </el-table>
-      <div v-else style="color:#999;text-align:center;padding:16px">暂无操作日志</div>
+      <div v-else style="color:#999;text-align:center;padding:16px">暂无操作记录</div>
 
       <!-- 保存后在只读模式下显示花型信息 -->
       <div v-if="sheet?.status !== '草稿' && items.length">
@@ -413,7 +403,6 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion } from '../../api/processSheet'
-import { getContractLogs } from '../../api/production'
 import { listSpecs } from '../../api/spec'
 import { listBasicData, getColorMapping } from '../../api/basicData'
 import { uploadImages } from '../../api/upload'
@@ -425,8 +414,41 @@ const packagingTypes = ref([])
 const colorMapping = ref({})
 const loading = ref(false)
 const savingDetail = ref(false)
-const contractLogs = ref([])
-const logsLoading = ref(false)
+const sheetLogs = computed(() => {
+  const logs = []
+  if (!sheet.value) return logs
+  logs.push({
+    time: sheet.value.created_at || '—',
+    action: '工艺单创建',
+    version: 'V0',
+    detail: `创建人: ${sheet.value.created_by || '—'}`,
+  })
+  if (sheet.value.version_marked) {
+    logs.push({
+      time: sheet.value.updated_at || '—',
+      action: '客户沟通标记',
+      version: formatVersion(sheet.value.confirm_version_no),
+      detail: `版本说明: ${sheet.value.version_note || '无'}`,
+    })
+  }
+  if (sheet.value.status === '保存' || sheet.value.status === '已下发') {
+    logs.push({
+      time: sheet.value.updated_at || '—',
+      action: '客户确认',
+      version: formatVersion(sheet.value.confirm_version_no),
+      detail: '客户已确认，版本锁定',
+    })
+  }
+  if (sheet.value.status === '已下发') {
+    logs.push({
+      time: sheet.value.updated_at || '—',
+      action: '工艺单下发',
+      version: formatVersion(sheet.value.confirm_version_no),
+      detail: '工艺单已发至车间',
+    })
+  }
+  return logs
+})
 
 // Items and detail data (reactive copies for editing)
 const items = ref([])
@@ -514,15 +536,6 @@ const specWeightText = computed(() => {
   const spec = firstSpec.value
   return spec ? spec.weight : '—'
 })
-
-const snapshotContractVersion = computed(() => {
-  if (!sheet.value?.contract_snapshot) return 0
-  const snap = typeof sheet.value.contract_snapshot === 'string'
-    ? JSON.parse(sheet.value.contract_snapshot)
-    : sheet.value.contract_snapshot
-  return snap.latest_confirm_version || 0
-})
-
 
 const accessories = computed(() => {
   if (!detailData) return []
@@ -863,20 +876,6 @@ async function handleSaveDetail() {
   }
 }
 
-async function loadLogs() {
-  if (!sheet.value?.contract?.id) return
-  if (!sheet.value?.items?.length) return
-  logsLoading.value = true
-  try {
-    const itemIds = sheet.value.items.map(item => item.contract_item_id).filter(Boolean)
-    const lRes = await getContractLogs(sheet.value.contract.id)
-    contractLogs.value = (lRes.data || []).filter(log =>
-      !log.contract_item_id || itemIds.includes(log.contract_item_id)
-    )
-  } catch { /* ignore */ }
-  finally { logsLoading.value = false }
-}
-
 async function loadData() {
   loading.value = true
   try {
@@ -934,7 +933,6 @@ async function loadData() {
       box_note_3: dd.box_note_3 || '',
       emboss_model: dd.emboss_model || '',
     })
-    loadLogs()
   } catch { ElMessage.error('加载失败') }
   finally { loading.value = false }
 }
