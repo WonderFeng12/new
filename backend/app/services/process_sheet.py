@@ -149,15 +149,15 @@ def _build_sheet_change_summary(detail_data: dict, old_detail: dict,
         if str(old_val or "") != str(new_val or ""):
             changes.append(f"{label}({old_val or '空'}→{new_val or '空'})")
 
-    for i in range(1, 11):
+    for i in range(1, 21):
         f = f"tech_note_{i}"
         if str(old_detail.get(f, "") or "") != str((detail_data or {}).get(f, "") or ""):
             changes.append(f"技术说明{i}")
-    for i in range(1, 6):
+    for i in range(1, 21):
         f = f"pack_note_{i}"
         if str(old_detail.get(f, "") or "") != str((detail_data or {}).get(f, "") or ""):
             changes.append(f"包装说明{i}")
-    for i in range(1, 4):
+    for i in range(1, 21):
         f = f"box_note_{i}"
         if str(old_detail.get(f, "") or "") != str((detail_data or {}).get(f, "") or ""):
             changes.append(f"箱单说明{i}")

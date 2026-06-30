@@ -191,16 +191,15 @@
         <span v-else style="color:#999">无辅料信息</span>
 
         <el-divider>包装箱单</el-divider>
-        <el-descriptions :column="2" border>
-          <el-descriptions-item v-for="i in 5" :key="'pn'+i" :label="'包装'+i">
-            {{ detailData?.[`pack_note_${i}`] || '—' }}
-          </el-descriptions-item>
-        </el-descriptions>
-        <el-descriptions :column="3" border style="margin-top:8px">
-          <el-descriptions-item v-for="i in 3" :key="'bn'+i" :label="'箱单'+i">
-            {{ detailData?.[`box_note_${i}`] || '—' }}
-          </el-descriptions-item>
-        </el-descriptions>
+        <div v-for="i in 8" :key="'pnr'+i">
+          <div v-if="detailData[`pack_note_${i}`]" style="padding:2px 0;font-size:13px">{{ detailData[`pack_note_${i}`] }}</div>
+        </div>
+        <template v-if="detailData.box_note_1 || detailData.box_note_2 || detailData.box_note_3 || extraBoxNoteCount">
+          <el-divider style="margin:8px 0">包装箱要求</el-divider>
+          <div v-for="i in 6" :key="'bnr'+i">
+            <div v-if="detailData[`box_note_${i}`]" style="padding:2px 0;font-size:13px">{{ detailData[`box_note_${i}`] }}</div>
+          </div>
+        </template>
       </div>
     </el-card>
 
@@ -402,22 +401,55 @@
           </el-tab-pane>
 
           <el-tab-pane label="包装箱单">
-            <el-divider>包装说明 (5项)</el-divider>
-            <el-row :gutter="20">
-              <el-col :span="12" v-for="i in 5" :key="'pn'+i">
-                <el-form-item :label="'包装'+i">
-                  <el-input v-model="detailData[`pack_note_${i}`]" type="textarea" :rows="2" @change="onDetailChange" />
-                </el-form-item>
+            <el-divider>包装 (3项)</el-divider>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.pack_note_1" type="textarea" :rows="2" @change="onDetailChange" />
               </el-col>
             </el-row>
-            <el-divider>箱单说明 (3项)</el-divider>
-            <el-row :gutter="20">
-              <el-col :span="8" v-for="i in 3" :key="'bn'+i">
-                <el-form-item :label="'箱单'+i">
-                  <el-input v-model="detailData[`box_note_${i}`]" type="textarea" :rows="2" @change="onDetailChange" />
-                </el-form-item>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.pack_note_2" type="textarea" :rows="2" @change="onDetailChange" />
               </el-col>
             </el-row>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.pack_note_3" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" v-for="i in extraPackNoteCount" :key="'extraPn'+(3+i)" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData[`pack_note_${3+i}`]" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="24">
+                <el-button type="primary" text @click="addPackNote">+ 新增包装说明</el-button>
+              </el-col>
+            </el-row>
+
+            <el-divider>包装箱要求 (2项)</el-divider>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.box_note_1" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.box_note_2" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" v-for="i in extraBoxNoteCount" :key="'extraBn'+(2+i)" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData[`box_note_${2+i}`]" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="24">
+                <el-button type="primary" text @click="addBoxNote">+ 新增箱单说明</el-button>
+              </el-col>
+            </el-row>
+
             <el-row :gutter="20" style="margin-top:8px">
               <el-col :span="8">
                 <el-form-item label="压花模型">
@@ -561,12 +593,30 @@ async function loadLogs() {
 const items = ref([])
 const detailData = reactive({})
 const extraTechNoteCount = ref(0)
+const extraPackNoteCount = ref(0)
+const extraBoxNoteCount = ref(0)
 
 function addTechNote() {
   extraTechNoteCount.value++
   const key = 5 + extraTechNoteCount.value
   if (!detailData[`tech_note_${key}`]) {
     detailData[`tech_note_${key}`] = ''
+  }
+}
+
+function addPackNote() {
+  extraPackNoteCount.value++
+  const key = 3 + extraPackNoteCount.value
+  if (!detailData[`pack_note_${key}`]) {
+    detailData[`pack_note_${key}`] = ''
+  }
+}
+
+function addBoxNote() {
+  extraBoxNoteCount.value++
+  const key = 2 + extraBoxNoteCount.value
+  if (!detailData[`box_note_${key}`]) {
+    detailData[`box_note_${key}`] = ''
   }
 }
 
@@ -863,6 +913,10 @@ function removeSubImg(key, idx, iidx) {
 function openItemDetail(index) {
   activeIdx.value = index
   syncPatternData(items.value[index])
+  if (!detailData.pack_note_1) {
+    const pkg = items.value[index]?.packaging_type || '包装'
+    detailData.pack_note_1 = `每${pkg}条毛毯+只钢丝插好彩页`
+  }
   showDetailDialog.value = true
 }
 
@@ -1128,6 +1182,24 @@ async function loadData() {
       }
     }
 
+    // Count existing extra pack notes
+    const maxPackNote = Math.max(...Object.keys(dd).filter(k => /^pack_note_\d+$/.test(k)).map(k => parseInt(k.split('_')[2])).filter(n => n > 3), 3)
+    extraPackNoteCount.value = Math.max(0, maxPackNote - 3)
+    for (let i = 4; i <= maxPackNote; i++) {
+      if (dd[`pack_note_${i}`]) {
+        detailData[`pack_note_${i}`] = dd[`pack_note_${i}`]
+      }
+    }
+
+    // Count existing extra box notes
+    const maxBoxNote = Math.max(...Object.keys(dd).filter(k => /^box_note_\d+$/.test(k)).map(k => parseInt(k.split('_')[2])).filter(n => n > 2), 2)
+    extraBoxNoteCount.value = Math.max(0, maxBoxNote - 2)
+    for (let i = 3; i <= maxBoxNote; i++) {
+      if (dd[`box_note_${i}`]) {
+        detailData[`box_note_${i}`] = dd[`box_note_${i}`]
+      }
+    }
+
     Object.assign(detailData, {
       binding_material: dd.binding_material || '',
       binding_width: dd.binding_width || '',
@@ -1163,13 +1235,10 @@ async function loadData() {
       washing_labels: dd.washing_labels?.length ? dd.washing_labels : [{ label: '洗标', size: '', qty: '', images: [] }],
       origin_labels: dd.origin_labels?.length ? dd.origin_labels : [{ label: '产地标', size: '', qty: '', images: [] }],
       pack_note_1: dd.pack_note_1 || '',
-      pack_note_2: dd.pack_note_2 || '',
+      pack_note_2: dd.pack_note_2 || '花型分配:',
       pack_note_3: dd.pack_note_3 || '',
-      pack_note_4: dd.pack_note_4 || '',
-      pack_note_5: dd.pack_note_5 || '',
       box_note_1: dd.box_note_1 || '',
       box_note_2: dd.box_note_2 || '',
-      box_note_3: dd.box_note_3 || '',
       emboss_model: dd.emboss_model || '',
     })
   } catch { ElMessage.error('加载失败') }
