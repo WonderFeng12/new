@@ -262,8 +262,8 @@
               <template v-if="activeItem.pattern_count > 0">
                 <div v-for="(p, pi) in activeItem.pattern_data" :key="pi" style="border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:8px">
                   <el-row :gutter="8" type="flex" align="middle">
-                    <el-col :span="7" style="display:flex;align-items:center;min-height:40px;padding-left:0">
-                      <el-form-item :label="getPatternLabel(pi, activeItem)" label-width="85px" label-style="padding-left:0" style="margin-bottom:0">
+                    <el-col :span="7" style="display:flex;align-items:center;min-height:40px;padding-left:0!important">
+                      <el-form-item :label="getPatternLabel(pi, activeItem)" label-width="100px" label-style="padding-left:0" style="margin-bottom:0">
                         <el-input v-model="p.code" />
                       </el-form-item>
                     </el-col>
