@@ -450,13 +450,6 @@
               </el-col>
             </el-row>
 
-            <el-row :gutter="20" style="margin-top:8px">
-              <el-col :span="8">
-                <el-form-item label="压花模型">
-                  <el-input v-model="detailData.emboss_model" @change="onDetailChange" />
-                </el-form-item>
-              </el-col>
-            </el-row>
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -1237,9 +1230,8 @@ async function loadData() {
       pack_note_1: dd.pack_note_1 || '',
       pack_note_2: dd.pack_note_2 || '花型分配:',
       pack_note_3: dd.pack_note_3 || '',
-      box_note_1: dd.box_note_1 || '',
+      box_note_1: dd.box_note_1 || '？个柜,？包/柜',
       box_note_2: dd.box_note_2 || '',
-      emboss_model: dd.emboss_model || '',
     })
   } catch { ElMessage.error('加载失败') }
   finally {
