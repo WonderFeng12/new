@@ -4,33 +4,35 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: huazhi
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
     environment:
-      DATABASE_URL: mysql+pymysql://root:root@db:3306/huazhi?charset=utf8mb4
-      SECRET_KEY: change-this-in-production
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/huazhi?charset=utf8mb4
+      SECRET_KEY: ${SECRET_KEY}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      retries: 3
+    restart: unless-stopped
 
   frontend:
     build:
@@ -40,6 +42,7 @@ services:
       - "80:80"
     depends_on:
       - backend
+    restart: unless-stopped
 
 volumes:
   mysql_data:

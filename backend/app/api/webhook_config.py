@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.dependencies import require_role
+from app.dependencies import require_permission
 from app.models.user import User
 from app.models.webhook_config import WebhookConfig
 from app.schemas.webhook_config import WebhookConfigCreate, WebhookConfigUpdate, WebhookConfigOut
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/webhook-configs", tags=["webhook-configs"])
 @router.get("", response_model=list[WebhookConfigOut])
 def list_webhooks(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理")),
+    current_user: User = Depends(require_permission("settings:webhook:view")),
 ):
     return db.query(WebhookConfig).order_by(WebhookConfig.id).all()
 
@@ -21,7 +21,7 @@ def list_webhooks(
 def create_webhook(
     data: WebhookConfigCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理")),
+    current_user: User = Depends(require_permission("settings:webhook:manage")),
 ):
     existing = db.query(WebhookConfig).filter(WebhookConfig.name == data.name).first()
     if existing:
@@ -38,7 +38,7 @@ def update_webhook(
     webhook_id: int,
     data: WebhookConfigUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理")),
+    current_user: User = Depends(require_permission("settings:webhook:manage")),
 ):
     wh = db.query(WebhookConfig).filter(WebhookConfig.id == webhook_id).first()
     if not wh:
@@ -58,7 +58,7 @@ def update_webhook(
 def delete_webhook(
     webhook_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理")),
+    current_user: User = Depends(require_permission("settings:webhook:manage")),
 ):
     wh = db.query(WebhookConfig).filter(WebhookConfig.id == webhook_id).first()
     if not wh:

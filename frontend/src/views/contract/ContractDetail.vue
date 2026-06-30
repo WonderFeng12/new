@@ -9,9 +9,9 @@
             <el-tag :type="statusType(contract?.status)" size="small">{{ contract?.status }}</el-tag>
             <el-tag v-if="contract?.latest_confirm_version" size="small" type="info" style="margin-left:4px">V{{ contract?.latest_confirm_version }}</el-tag>
             <el-button size="small" style="margin-left:8px" @click="$router.push(`/contracts/${contract?.id}/edit`)" :disabled="contract?.status!=='草稿'">编辑</el-button>
-            <el-button size="small" type="warning" @click="handleReopenEdit" :disabled="contract?.status=='草稿'" v-if="userRole === '销售经理' || userRole === '业务员'">重新编辑</el-button>
-            <el-button size="small" type="warning" @click="handleRequestConfirm" :disabled="contract?.status!=='草稿'" v-if="userRole === '业务员' || userRole === '销售经理'">请求确认</el-button>
-            <el-button size="small" type="danger" @click="manualConfirmDialogVisible = true" :disabled="contract?.status!=='草稿'" v-if="userRole === '销售经理'">确认</el-button>
+            <el-button size="small" type="warning" @click="handleReopenEdit" :disabled="contract?.status=='草稿'" v-if="permStore.hasPermission('contract:reopen_edit')">重新编辑</el-button>
+            <el-button size="small" type="warning" @click="handleRequestConfirm" :disabled="contract?.status!=='草稿'" v-if="permStore.hasPermission('contract:request_confirm')">请求确认</el-button>
+            <el-button size="small" type="danger" @click="manualConfirmDialogVisible = true" :disabled="contract?.status!=='草稿'" v-if="permStore.hasPermission('contract:manual_confirm')">确认</el-button>
           </span>
         </div>
       </template>
@@ -32,7 +32,7 @@
                 <el-link type="primary" @click="$router.push(`/process-sheets/${row.process_sheet_id}`)">{{ row.process_sheet_no }}</el-link>
                 <el-tag :type="row.process_sheet_status==='已下发'?'success':'info'" size="small" style="margin-left:8px">{{ row.process_sheet_status }}</el-tag>
                 <el-tag v-if="row.process_sheet_version > 0" size="small" style="margin-left:4px">V{{ row.process_sheet_version }}</el-tag>
-                <el-tag v-if="(contract?.latest_confirm_version || 0) > (row.process_sheet_version || 0)" type="warning" size="small" style="margin-left:4px">合同已更新至V{{ contract?.latest_confirm_version }}，建议重新生成</el-tag>
+                <el-tag v-if="(contract?.latest_confirm_version || 0) > (row.process_sheet_contract_version || 0)" type="warning" size="small" style="margin-left:4px">合同已更新至V{{ contract?.latest_confirm_version }}，建议重新生成</el-tag>
               </div>
               <div v-if="row.yarn_plan_no" style="margin-bottom:4px">
                 <strong>坯布计划单号：</strong>{{ row.yarn_plan_no }}
@@ -187,9 +187,12 @@ import { getContract, manualConfirm, requestConfirm, reopenEdit } from '../../ap
 import { listProcessSteps, advanceItem, rollbackItem, cancelItem, restoreItem, releaseYarnPlan, getContractLogs, pushDownItem } from '../../api/production'
 import { listUsers } from '../../api/user'
 import StatusLog from '../../components/StatusLog.vue'
+import { usePermissionStore } from '../../store/permissions'
 
 const route = useRoute()
 const router = useRouter()
+
+const permStore = usePermissionStore()
 
 const contract = ref(null)
 const loading = ref(false)
@@ -214,15 +217,6 @@ const manualConfirmRemark = ref('')
 const pushDownDialogVisible = ref(false)
 const pushDownTarget = ref(null)
 const pushDownProcessRemark = ref('')
-
-const userRole = computed(() => {
-  try {
-    const token = localStorage.getItem('token')
-    if (!token) return ''
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return payload.role
-  } catch { return '' }
-})
 
 const currentUserId = computed(() => {
   try {
@@ -279,39 +273,33 @@ function statusLabel(code) {
 
 function canReleaseYarn(row) {
   if (row.production_status === 'cancelled') return false
-  const role = userRole.value
   if (contract.value?.status === '草稿') return false
-  return (role === '销售经理' || role === '生产专员') && !row.production_status
+  return permStore.hasPermission('production:yarn_plan') && !row.production_status
 }
 
 function canAdvance(row) {
   if (!row.production_status) return false
   if (row.production_status === 'cancelled' || row.production_status === 'completed') return false
-  const role = userRole.value
-  if (role === '销售经理' || role === '生产专员') return true
-  if (role === '外协人员' && row.production_status === 'weaving') return true
+  if (permStore.hasPermission('production:advance')) return true
+  if (currentUserId.value === row.yarn_plan_user_id && row.production_status === 'weaving') return true
   return false
 }
 
 function canRollback(row) {
-  const role = userRole.value
-  return (role === '销售经理' || role === '生产专员') && row.production_status && row.production_status !== 'cancelled'
+  return permStore.hasPermission('production:rollback') && row.production_status && row.production_status !== 'cancelled'
 }
 
 function canCancel(row) {
-  const role = userRole.value
-  return (role === '销售经理' || role === '生产专员' || role === '业务员') && row.production_status !== 'cancelled'
+  return permStore.hasPermission('production:cancel') && row.production_status !== 'cancelled'
 }
 
 function canRestore(row) {
-  const role = userRole.value
-  return (role === '销售经理' || role === '生产专员') && row.production_status === 'cancelled'
+  return permStore.hasPermission('production:restore') && row.production_status === 'cancelled'
 }
 
 function canPushDown(row) {
   if (row.production_status === 'cancelled') return false
-  const role = userRole.value
-  if (role !== '销售经理' && role !== '生产专员') return false
+  if (!permStore.hasPermission('contract:push_down')) return false
   if (contract.value?.status !== '确认' && contract.value?.status !== '已下发') return false
   return !row.has_process_sheet
 }

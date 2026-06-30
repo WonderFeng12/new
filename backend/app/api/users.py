@@ -3,16 +3,10 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.user import UserCreate, UserOut, UserUpdate, UserPasswordReset
 from app.services.auth import hash_password, get_current_user
+from app.dependencies import require_permission
 from app.models.user import User
 
 router = APIRouter(prefix="/api/users", tags=["users"])
-
-
-def _require_admin(current_user: User):
-    """Only sales manager (admin) can manage users."""
-    if current_user.role != "销售经理":
-        raise HTTPException(status_code=403, detail="仅管理员可管理用户")
-    return current_user
 
 
 @router.get("", response_model=list[UserOut])
@@ -28,9 +22,9 @@ def list_users(
 def create_user(
     data: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("settings:user:manage")),
 ):
-    _require_admin(current_user)
+
     existing = db.query(User).filter(User.username == data.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="用户名已存在")
@@ -51,9 +45,8 @@ def update_user(
     user_id: int,
     data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("settings:user:manage")),
 ):
-    _require_admin(current_user)
     user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -75,9 +68,8 @@ def reset_password(
     user_id: int,
     data: UserPasswordReset,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("settings:user:manage")),
 ):
-    _require_admin(current_user)
     user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -90,9 +82,8 @@ def reset_password(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("settings:user:manage")),
 ):
-    _require_admin(current_user)
     user = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")

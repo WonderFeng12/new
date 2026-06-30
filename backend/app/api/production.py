@@ -4,7 +4,7 @@ from typing import Optional
 import json
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.dependencies import get_current_user, require_role
+from app.dependencies import get_current_user, require_permission
 from app.models.user import User
 from app.schemas.process_step import (
     ProcessStepCreate, ProcessStepUpdate, ProcessStepWithAssignees, AssigneesUpdate
@@ -53,7 +53,7 @@ def list_steps(
 def create_step(
     data: ProcessStepCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("production:manage_steps")),
 ):
     return step_service.create_step(db, data)
 
@@ -63,7 +63,7 @@ def update_step(
     id: int,
     data: ProcessStepUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("production:manage_steps")),
 ):
     return step_service.update_step(db, id, data)
 
@@ -72,7 +72,7 @@ def update_step(
 def delete_step(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("production:manage_steps")),
 ):
     return step_service.delete_step(db, id)
 
@@ -82,7 +82,7 @@ def set_assignees(
     id: int,
     data: AssigneesUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("production:manage_steps")),
 ):
     return step_service.set_assignees(db, id, data.user_ids)
 
@@ -166,7 +166,7 @@ def release_yarn_plan(
     id: int,
     req: YarnPlanRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("production:yarn_plan")),
 ):
     item, log = prod_service.release_yarn_plan(db, id, current_user.id, req.yarn_plan_user_id, req.remark)
     return {"message": "坯布计划已下达", "production_status": item.production_status}
@@ -177,10 +177,8 @@ def push_down_item(
     id: int,
     data: PushDownRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:push_down")),
 ):
-    if current_user.role not in ("销售经理", "生产专员"):
-        raise HTTPException(status_code=403, detail="权限不足")
     result = prod_service.push_down_item_to_process_sheet(db, id, current_user.id, data.process_remark or "")
     if not result:
         raise HTTPException(status_code=400, detail="下推失败")
@@ -248,10 +246,8 @@ def get_contract_logs(
 def restore_item(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("production:restore")),
 ):
-    if current_user.role not in ("销售经理", "生产专员"):
-        raise HTTPException(status_code=403, detail="权限不足")
     item, log = prod_service.restore_item(db, id, current_user.id)
     return {"message": "已恢复", "production_status": item.production_status}
 
@@ -285,7 +281,7 @@ def get_my_tasks(
 @router.get("/settings/wecom")
 def get_wecom_settings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("settings:webhook:view")),
 ):
     from app.models.system_config import SystemConfig
     configs = db.query(SystemConfig).filter(
@@ -299,7 +295,7 @@ def get_wecom_settings(
 def update_wecom_settings(
     data: dict[str, str],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("settings:webhook:manage")),
 ):
     from app.models.system_config import SystemConfig
     for key, value in data.items():
@@ -319,7 +315,7 @@ def update_wecom_settings(
 @router.get("/settings/default-confirm-users")
 def get_default_confirm_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理")),
+    current_user: User = Depends(require_permission("sheet:set_confirm_users")),
 ):
     from app.models.system_config import SystemConfig
     config = db.query(SystemConfig).filter(
@@ -333,7 +329,7 @@ def get_default_confirm_users(
 def set_default_confirm_users(
     data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理")),
+    current_user: User = Depends(require_permission("sheet:set_confirm_users")),
 ):
     from app.models.system_config import SystemConfig
     user_ids = data.get("user_ids", [])

@@ -1,7 +1,13 @@
+import os
 from datetime import datetime
 import json
 
+from app.config import settings
+
 HAS_WEASYPRINT = False
+
+UPLOAD_DIR = settings.UPLOAD_DIR
+
 
 def _get_weasyprint():
     """Lazy import WeasyPrint — only loaded when PDF is actually generated."""
@@ -24,7 +30,6 @@ def format_version(v):
 
 
 def _snap_val(snap, key, default=""):
-    """Safely extract a value from contract_snapshot (JSON field) or snapshot dict."""
     if not snap:
         return default
     if isinstance(snap, str):
@@ -35,18 +40,51 @@ def _snap_val(snap, key, default=""):
     return snap.get(key, default)
 
 
-def render_process_sheet(sheet, contract, items) -> bytes:
-    """Render a process sheet to PDF bytes.
+def _resolve_image_path(relative_path):
+    if not relative_path:
+        return ""
+    path = relative_path
+    if path.startswith("/uploads/"):
+        path = path[len("/uploads/"):]
+    abs_path = os.path.join(UPLOAD_DIR, path)
+    if os.path.exists(abs_path):
+        return f"file://{abs_path}"
+    return ""
 
-    Args:
-        sheet: ProcessSheet model instance
-        contract: Contract model instance (for top-level info, fallback)
-        items: list of ProcessSheetItem (NOT ContractItem)
-    """
+
+def _img_tag(path, alt="", w=60, h=60):
+    resolved = _resolve_image_path(path)
+    if not resolved:
+        return ""
+    return f'<img src="{resolved}" alt="{alt}" style="max-width:{w}px;max-height:{h}px;object-fit:contain;border:1px solid #ccc;border-radius:2px;margin:1px">'
+
+
+def _img_cell(paths, alt_prefix=""):
+    tags = []
+    for p in paths:
+        if p:
+            t = _img_tag(p, alt_prefix, w=55, h=55)
+            if t:
+                tags.append(t)
+    if not tags:
+        return ""
+    return "".join(tags)
+
+
+def _notes_html(data, prefix, count):
+    items_list = []
+    for i in range(1, count + 1):
+        val = data.get(f"{prefix}_{i}", "") or ""
+        if val.strip():
+            items_list.append(f"<li>{val.strip()}</li>")
+    return "".join(items_list)
+
+
+def render_process_sheet(sheet, contract, items) -> bytes:
     detail = sheet.detail_data or {}
     snap = sheet.contract_snapshot or {}
 
-    # ── Item rows (from ProcessSheetItem) ──
+    # ── Item rows and image rows ──
     item_rows = ""
     for i in items:
         spec_name = ""
@@ -55,83 +93,206 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         packaging = i.packaging_type or ""
         pressed = "压花" if i.is_pressed else ""
         p_remark = i.process_remark or ""
+
+        # Pattern images + info
+        pattern_images = []
+        pattern_data = i.pattern_data or []
+        if isinstance(pattern_data, str):
+            try:
+                pattern_data = json.loads(pattern_data)
+            except (json.JSONDecodeError, TypeError):
+                pattern_data = []
+
+        pattern_img_html = ""
+        for pd_item in pattern_data:
+            if isinstance(pd_item, dict):
+                img = pd_item.get("image", "")
+                code = pd_item.get("code", "") or ""
+                color = pd_item.get("color", "") or ""
+                binding_no = pd_item.get("binding_color_no", "") or ""
+                if img:
+                    info_parts = []
+                    if code:
+                        info_parts.append(code)
+                    if color:
+                        info_parts.append(f"颜色:{color}")
+                    if binding_no:
+                        info_parts.append(f"色号:{binding_no}")
+                    info_str = " | ".join(info_parts)
+                    pattern_img_html += f'<div style="display:inline-block;text-align:center;margin:1px 4px 1px 0;vertical-align:top">'
+                    pattern_img_html += _img_tag(img, "花型", w=60, h=60)
+                    if info_str:
+                        pattern_img_html += f'<div style="font-size:6.5pt;color:#555;line-height:1.2;max-width:60px;word-wrap:break-word">{info_str}</div>'
+                    pattern_img_html += "</div>"
+
+        # A/B side images
+        a_images = []
+        for img_key in ["image_a_1", "image_a_2", "image_a_3"]:
+            val = getattr(i, img_key, None) or ""
+            if val:
+                a_images.append(val)
+        b_images = []
+        for img_key in ["image_b_1", "image_b_2", "image_b_3"]:
+            val = getattr(i, img_key, None) or ""
+            if val:
+                b_images.append(val)
+
+        # Pressed image
+        pressed_path = getattr(i, "pressed_image", None) or ""
+
+        # Build image row
+        imgs_html = ""
+        if pattern_img_html:
+            imgs_html += f'<span style="font-size:7pt;color:#888;margin-right:2px">花型:</span>{pattern_img_html}'
+        if a_images:
+            imgs_html += f'<span style="font-size:7pt;color:#888;margin:0 2px">A面:</span>{_img_cell(a_images, "A面")}'
+        if b_images:
+            imgs_html += f'<span style="font-size:7pt;color:#888;margin:0 2px">B面:</span>{_img_cell(b_images, "B面")}'
+        if pressed_path:
+            imgs_html += f'<span style="font-size:7pt;color:#888;margin:0 2px">压花:</span>{_img_tag(pressed_path, "压花", w=55, h=55)}'
+
+        if imgs_html:
+            imgs_html = f'<tr><td colspan="6" style="padding:2px 5px;border-top:none">{imgs_html}</td></tr>'
+
         item_rows += f"""
         <tr>
             <td style="text-align:center">{i.line_no}</td>
             <td>{spec_name}</td>
-            <td>{i.pattern_code or ''}</td>
-            <td>{i.color_a or ''}{' / ' + (i.color_b or '') if i.color_b else ''}</td>
             <td style="text-align:center">{packaging}</td>
             <td style="text-align:center">{pressed}</td>
-            <td style="text-align:right">{i.qty or 0}</td>
+            <td style="text-align:right">{float(i.qty or 0):.1f}</td>
             <td>{p_remark}</td>
-            <td>{i.remark or ''}</td>
-        </tr>"""
+        </tr>{imgs_html}"""
 
-    # ── Accessories from detail_data ──
-    acc_labels = {1: "包贴彩卡", 2: "彩卡", 3: "钢丝袋", 4: "真空包", 5: "辅料", 6: "辅料"}
-    accessories_html = ""
-    for idx in range(1, 7):
+    # ── Accessories grid ──
+    acc_labels = {1: "包贴彩卡", 2: "彩卡", 3: "钢丝袋", 4: "真空包", 5: "辅料1", 6: "辅料2"}
+
+    def _acc_cell(idx):
         desc = detail.get(f"accessory_desc_{idx}", "") or ""
         size = detail.get(f"accessory_size_{idx}", "") or ""
         qty = detail.get(f"accessory_qty_{idx}", "") or ""
-        if desc or size or qty:
-            label = desc or acc_labels.get(idx, f"辅料{idx}")
-            accessories_html += f"<tr><td>{label}</td><td>{size}</td><td style='text-align:right'>{qty}</td></tr>"
+        img_html = _acc_images(detail, idx)
+        if not desc and not size and not qty and not img_html:
+            return ""
+        label = desc or acc_labels.get(idx, f"辅料{idx}")
+        cell = f'<strong style="font-size:7.5pt">{label}</strong>'
+        parts = []
+        if qty:
+            parts.append(qty)
+        if size:
+            parts.append(size)
+        if parts:
+            cell += f'<br><span style="font-size:7pt;color:#666">{" | ".join(parts)}</span>'
+        if img_html:
+            cell += f"<br>{img_html}"
+        return cell
 
-    # Washing / origin labels from detail_data
-    for label_list_key, label_name in [("washing_labels", "洗标"), ("origin_labels", "产地标")]:
-        label_list = detail.get(label_list_key, [])
-        if label_list:
-            for lb in label_list:
-                if lb.get("size") or lb.get("qty") or lb.get("images"):
-                    accessories_html += f"<tr><td>{label_name}</td><td>{lb.get('size', '')}</td><td style='text-align:right'>{lb.get('qty', '')}</td></tr>"
+    def _label_cell(label_name, label_item):
+        img_html = _img_cell(label_item.get("images", []), label_name)
+        size = label_item.get("size", "") or ""
+        qty = label_item.get("qty", "") or ""
+        if not size and not qty and not img_html:
+            return ""
+        cell = f'<strong style="font-size:7.5pt">{label_name}</strong>'
+        parts = []
+        if qty:
+            parts.append(qty)
+        if size:
+            parts.append(size)
+        if parts:
+            cell += f'<br><span style="font-size:7pt;color:#666">{" | ".join(parts)}</span>'
+        if img_html:
+            cell += f"<br>{img_html}"
+        return cell
 
-    # ── Notes sections ──
-    def _notes_html(prefix, count):
-        items_list = []
-        for i in range(1, count + 1):
-            val = detail.get(f"{prefix}_{i}", "") or ""
-            if val.strip():
-                items_list.append(f"<li>{val.strip()}</li>")
-        return "".join(items_list)
+    # 包贴彩卡 (idx 1) — spans 2 cols and 2 rows
+    c1 = _acc_cell(1)
+    has_baotie = bool(c1)
 
-    tech_notes = _notes_html("tech_note", 10)
-    pack_notes = _notes_html("pack_note", 5)
-    box_notes = _notes_html("box_note", 3)
+    # Row 1: 洗标 | 产地标 | 包贴彩卡(colspan=2, rowspan=2)
+    row1_leading = []
+    for lb in (detail.get("washing_labels") or []):
+        c = _label_cell("洗标", lb)
+        if c:
+            row1_leading.append(c)
+    for lb in (detail.get("origin_labels") or []):
+        c = _label_cell("产地标", lb)
+        if c:
+            row1_leading.append(c)
 
-    # ── Version and date (top right) ──
+    # Row 2: 钢丝袋 | 真空包 (最多2个)
+    row2_cells = []
+    for idx in [3, 4, 2, 5, 6]:
+        c = _acc_cell(idx)
+        if c:
+            row2_cells.append(c)
+            if len(row2_cells) >= 2:
+                break
+
+    accessories_html = ""
+    if row1_leading or has_baotie or row2_cells:
+        rows_html = ""
+        col_w = 25
+
+        # Row 1: 洗标/产地标 (up to 2 cols) | 包贴彩卡 (colspan=2, rowspan=2)
+        r1 = ""
+        for c in row1_leading[:2]:
+            r1 += f'<td style="width:{col_w}%;padding:3px 6px;border:1px solid #333;vertical-align:top">{c}</td>'
+        r1 += f'<td style="width:{col_w}%;padding:3px 6px;border:1px solid #333"></td>' * (2 - len(row1_leading[:2]))
+        bt = c1 if has_baotie else ""
+        r1 += f'<td colspan="2" rowspan="2" style="width:50%;padding:3px 6px;border:1px solid #333;vertical-align:top">{bt}</td>'
+        rows_html += f"<tr>{r1}</tr>"
+
+        # Row 2: 钢丝袋 | 真空包 (cols 1-2, cols 3-4 occupied by rowspan)
+        r2 = ""
+        for c in row2_cells[:2]:
+            r2 += f'<td style="width:{col_w}%;padding:3px 6px;border:1px solid #333;vertical-align:top">{c}</td>'
+        r2 += f'<td style="width:{col_w}%;padding:3px 6px;border:1px solid #333"></td>' * (2 - len(row2_cells[:2]))
+        rows_html += f"<tr>{r2}</tr>"
+
+        accessories_html = f'<table style="width:100%;border-collapse:collapse">{rows_html}</table>'
+
+    # ── Notes ──
+    tech_notes = _notes_html(detail, "tech_note", 10)
+    pack_notes = _notes_html(detail, "pack_note", 5)
+    box_notes = _notes_html(detail, "box_note", 3)
+
+    # ── Version and date ──
     version_str = format_version(sheet.confirm_version_no)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # ── Contract info from snapshot or contract object ──
+    # ── Contract info ──
     customer_name = _snap_val(snap, "customer_name", contract.customer.name if contract and contract.customer else "")
     contract_no = _snap_val(snap, "contract_no", contract.contract_no if contract else "")
     contract_date = _snap_val(snap, "contract_date", str(contract.contract_date) if contract and contract.contract_date else "")
-    # total_amount: try snapshot first, then contract.total_amount
-    total_amount = "0.00"
-    snap_amount = _snap_val(snap, "total_amount", None)
-    if snap_amount is not None:
-        try:
-            total_amount = f"{float(snap_amount):.2f}"
-        except (ValueError, TypeError):
-            total_amount = "0.00"
-    elif contract and contract.total_amount:
-        total_amount = f"{float(contract.total_amount):.2f}"
+    delivery_date = items[0].delivery_date if items and items[0].delivery_date else detail.get("delivery_date", "") or ""
+
+    # ── Binding / emboss ──
+    binding_material = detail.get("binding_material", "") or ""
+    binding_width = detail.get("binding_width", "") or ""
+    emboss_model = detail.get("emboss_model", "") or ""
+
+    # Pressed image name from first item that has one
+    pressed_name = ""
+    for i in items:
+        pn = getattr(i, "pressed_image_name", None) or ""
+        if pn:
+            pressed_name = pn
+            break
 
     html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-    @page {{ margin: 10mm 14mm; size: A4; }}
+    @page {{ margin: 8mm 12mm; size: A4; }}
     @page {{ @bottom-center {{ content: counter(page) " / " counter(pages); font-size: 7pt; color: #999; }} }}
 
     body {{
         font-family: 'SimSun', 'Noto Serif CJK SC', 'Source Han Serif SC', 'STSong', 'AR PL New Sung', 'FangSong', serif;
-        font-size: 9pt;
+        font-size: 8.5pt;
         color: #222;
-        line-height: 1.5;
+        line-height: 1.35;
     }}
 
     .header {{
@@ -139,102 +300,110 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         justify-content: space-between;
         align-items: flex-start;
         border-bottom: 2px solid #222;
-        padding-bottom: 6px;
-        margin-bottom: 10px;
+        padding-bottom: 4px;
+        margin-bottom: 6px;
     }}
     .header-left h1 {{
         margin: 0;
-        font-size: 20pt;
+        font-size: 16pt;
         font-weight: bold;
-        letter-spacing: 4px;
+        letter-spacing: 2px;
     }}
     .header-left .company {{
-        font-size: 8pt;
+        font-size: 7pt;
         color: #666;
-        margin-top: 1px;
     }}
     .header-right {{
         text-align: right;
-        font-size: 8pt;
+        font-size: 7.5pt;
         color: #333;
     }}
     .header-right .ver {{
-        font-size: 13pt;
+        font-size: 11pt;
         font-weight: bold;
         color: #c00;
     }}
     .header-right .date {{
-        font-size: 7.5pt;
+        font-size: 7pt;
         color: #999;
-        margin-top: 1px;
     }}
 
     table {{
         width: 100%;
         border-collapse: collapse;
-        margin: 4px 0;
+        margin: 3px 0;
     }}
     td, th {{
         border: 1px solid #333;
-        padding: 3px 5px;
+        padding: 2px 4px;
         text-align: left;
-        vertical-align: top;
+        vertical-align: middle;
     }}
     th {{
         background: #f0f0f0;
         font-weight: bold;
-        font-size: 8.5pt;
+        font-size: 8pt;
         white-space: nowrap;
     }}
 
     .section-title {{
         font-weight: bold;
-        margin-top: 10px;
-        margin-bottom: 3px;
-        font-size: 10pt;
+        margin-top: 6px;
+        margin-bottom: 2px;
+        font-size: 9pt;
         background: #e8e8e8;
-        padding: 4px 8px;
+        padding: 2px 6px;
         border-left: 3px solid #c00;
     }}
 
     ul {{
-        margin: 3px 0;
-        padding-left: 20px;
+        margin: 2px 0;
+        padding-left: 16px;
     }}
     li {{
-        margin: 1px 0;
-        font-size: 8.5pt;
+        margin: 0;
+        font-size: 7.5pt;
+        line-height: 1.3;
     }}
 
     .info-table th {{
-        width: 12%;
+        width: 10%;
+        font-size: 7.5pt;
     }}
     .info-table td {{
         width: 23%;
+        font-size: 7.5pt;
     }}
 
     .item-table th {{
         background: #d9d9d9;
-        font-size: 8pt;
+        font-size: 7.5pt;
         text-align: center;
     }}
     .item-table td {{
-        font-size: 8.5pt;
+        font-size: 8pt;
     }}
 
     .footer-note {{
-        margin-top: 14px;
-        padding-top: 6px;
+        margin-top: 8px;
+        padding-top: 4px;
         border-top: 1px solid #ccc;
         color: #999;
-        font-size: 7pt;
+        font-size: 6.5pt;
         text-align: center;
     }}
 
-    .empty-row td {{
-        color: #aaa;
-        text-align: center;
-        font-size: 8pt;
+    .compact-info {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        padding: 3px 6px;
+        border: 1px solid #333;
+        font-size: 7.5pt;
+        margin: 3px 0;
+    }}
+    .compact-info span {{
+        white-space: nowrap;
     }}
 </style>
 </head>
@@ -257,16 +426,12 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         <tr>
             <th>工艺单号</th><td>{sheet.sheet_no}</td>
             <th>合同号</th><td>{contract_no}</td>
-        </tr>
-        <tr>
             <th>客户名称</th><td>{customer_name}</td>
-            <th>合同日期</th><td>{contract_date}</td>
         </tr>
         <tr>
-            <th>交货日期</th>
-            <td>{items[0].delivery_date if items and items[0].delivery_date else detail.get('delivery_date', '') or ''}</td>
-            <th>合同金额</th>
-            <td>¥{total_amount}</td>
+            <th>合同日期</th><td>{contract_date}</td>
+            <th>交货日期</th><td>{delivery_date}</td>
+            <th></th><td></td>
         </tr>
     </table>
 
@@ -275,59 +440,37 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     <table class="item-table">
         <tr>
             <th style="width:4%">行号</th>
-            <th style="width:16%">毛毯规格</th>
-            <th style="width:10%">花型代码</th>
-            <th style="width:12%">颜色（A/B面）</th>
-            <th style="width:8%">包装方式</th>
-            <th style="width:5%">压花</th>
-            <th style="width:6%">数量</th>
-            <th style="width:16%">工艺备注</th>
-            <th style="width:13%">备注</th>
+            <th style="width:28%">毛毯规格</th>
+            <th style="width:9%">包装方式</th>
+            <th style="width:6%">压花</th>
+            <th style="width:8%">数量</th>
+            <th style="width:20%">工艺备注</th>
         </tr>
         {item_rows}
     </table>
 
-    <!-- Binding and Emboss -->
-    <table class="info-table">
-        <tr>
-            <th style="width:12%">包边材料</th>
-            <td style="width:23%">{detail.get('binding_material', '') or ''}</td>
-            <th style="width:12%">包边宽度</th>
-            <td style="width:23%">{detail.get('binding_width', '') or ''}</td>
-            <th style="width:10%">色号</th>
-            <td style="width:20%">{detail.get('binding_color_no', '') or ''}</td>
-        </tr>
-        <tr>
-            <th>压花型号</th>
-            <td colspan="5">{detail.get('emboss_model', '') or ''}</td>
-        </tr>
-    </table>
+    <!-- Binding / Emboss (compact inline) -->
+    <div class="compact-info">
+        <span><strong>包边材料:</strong> {binding_material or '—'}</span>
+        <span><strong>包边宽度:</strong> {binding_width or '—'}</span>
+        <span><strong>压花型号:</strong> {pressed_name or emboss_model or '—'}</span>
+    </div>
 
-    <!-- Accessories -->
-    <div class="section-title">辅料明细</div>
-    <table>
-        <tr>
-            <th style="width:30%">名称</th>
-            <th style="width:40%">规格</th>
-            <th style="width:15%">数量</th>
-        </tr>
-        {accessories_html or '<tr class="empty-row"><td colspan="3">无</td></tr>'}
-    </table>
+    <!-- Accessories Grid -->
+    {accessories_html and f'<div class="section-title">辅料明细</div>' or ''}
+    {accessories_html}
 
-    <!-- Technical Notes -->
-    <div class="section-title">工艺说明</div>
-    <ul>{tech_notes or '<li style="color:#999">无</li>'}</ul>
-
-    <!-- Packaging Notes -->
-    <div class="section-title">包装说明</div>
-    <ul>{pack_notes or '<li style="color:#999">无</li>'}</ul>
-
-    <!-- Box Notes -->
-    <div class="section-title">箱单说明</div>
-    <ul>{box_notes or '<li style="color:#999">无</li>'}</ul>
+    <!-- Technical / Packaging / Box Notes in 2-column layout -->
+    <div style="display:flex;gap:12px;margin-top:4px">
+        <div style="flex:3">
+            {(tech_notes) and f'<div class="section-title">工艺说明</div><ul>{tech_notes}</ul>' or ''}
+            {(pack_notes) and f'<div class="section-title" style="margin-top:3px">包装说明</div><ul>{pack_notes}</ul>' or ''}
+            {(box_notes) and f'<div class="section-title" style="margin-top:3px">箱单说明</div><ul>{box_notes}</ul>' or ''}
+        </div>
+    </div>
 
     <div class="footer-note">
-        工艺单号: {sheet.sheet_no} &nbsp;|&nbsp; 版本: {version_str} &nbsp;|&nbsp; 打印时间: {now_str} &nbsp;|&nbsp; 嘉元瑞通
+        工艺单号: {sheet.sheet_no} | 版本: {version_str} | 打印时间: {now_str} | 嘉元瑞通
     </div>
 
 </body>
@@ -340,3 +483,19 @@ def render_process_sheet(sheet, contract, items) -> bytes:
             "On macOS also install system deps: brew install pango libffi"
         )
     return WHTML(string=html).write_pdf()
+
+
+def _acc_images(detail, idx):
+    """Get accessory images for a given index (1-6)."""
+    key = f"accessory_images_{idx}"
+    val = detail.get(key)
+    if not val:
+        return ""
+    if isinstance(val, str):
+        try:
+            val = json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            return ""
+    if isinstance(val, list):
+        return _img_cell(val[:3])
+    return ""

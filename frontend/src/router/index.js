@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { usePermissionStore } from '../store/permissions'
 
 const routes = [
   { path: '/login', component: () => import('../views/login/Login.vue') },
@@ -6,47 +7,47 @@ const routes = [
   {
     path: '/dashboard',
     component: () => import('../views/dashboard/Dashboard.vue'),
-    meta: { roles: ['业务员', '销售经理', '生产专员'] },
+    meta: { roles: ['业务员', '销售经理', '生产专员', '外协人员', '管理员'] },
   },
   {
     path: '/contracts',
     component: () => import('../views/contract/ContractList.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/contracts/new',
     component: () => import('../views/contract/ContractForm.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/contracts/:id',
     component: () => import('../views/contract/ContractDetail.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/contracts/:id/edit',
     component: () => import('../views/contract/ContractForm.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/customers',
     component: () => import('../views/customer/CustomerList.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/specs',
     component: () => import('../views/spec/SpecList.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/process-sheets',
     component: () => import('../views/processSheet/SheetList.vue'),
-    meta: { roles: ['业务员', '销售经理', '生产专员'] },
+    meta: { roles: ['业务员', '销售经理', '生产专员', '管理员'] },
   },
   {
     path: '/process-sheets/:id',
     component: () => import('../views/processSheet/SheetDetail.vue'),
-    meta: { roles: ['业务员', '销售经理', '生产专员'] },
+    meta: { roles: ['业务员', '销售经理', '生产专员', '管理员'] },
   },
   {
     path: '/confirm/:token',
@@ -55,7 +56,7 @@ const routes = [
   {
     path: '/basic-data',
     component: () => import('../views/basicData/BasicDataList.vue'),
-    meta: { roles: ['业务员', '销售经理'] },
+    meta: { roles: ['业务员', '销售经理', '管理员'] },
   },
   {
     path: '/process-steps',
@@ -64,17 +65,22 @@ const routes = [
   {
     path: '/my-tasks',
     component: () => import('../views/task/MyTasks.vue'),
-    meta: { roles: ['外协人员'] },
+    meta: { roles: ['外协人员', '管理员'] },
   },
   {
     path: '/settings/wecom',
     component: () => import('../views/settings/WeComSettings.vue'),
-    meta: { roles: ['销售经理'] },
+    meta: { roles: ['销售经理', '管理员'] },
   },
   {
     path: '/settings/users',
     component: () => import('../views/settings/UserList.vue'),
-    meta: { roles: ['销售经理'] },
+    meta: { roles: ['销售经理', '管理员'] },
+  },
+  {
+    path: '/settings/permissions',
+    component: () => import('../views/settings/PermissionMatrix.vue'),
+    meta: { roles: ['销售经理', '管理员'] },
   },
 ]
 
@@ -88,7 +94,13 @@ router.beforeEach((to, from, next) => {
       const payload = JSON.parse(atob(token.split('.')[1]))
       const role = payload.role
       if (to.meta.roles && !to.meta.roles.includes(role)) {
-        return next('/dashboard')
+        if (to.path !== '/dashboard') return next('/dashboard')
+      }
+      // Additional permission check when store is loaded
+      const permStore = usePermissionStore()
+      if (to.meta.permissions && permStore.loaded) {
+        const hasAll = to.meta.permissions.every(p => permStore.hasPermission(p))
+        if (!hasAll) return next('/dashboard')
       }
     } catch {}
   }

@@ -49,7 +49,7 @@
 │       ├── main.py            # FastAPI 入口，注册路由
 │       ├── config.py          # 配置（数据库、JWT、图片压缩参数）
 │       ├── database.py        # 数据库连接（SQLAlchemy engine/session）
-│       ├── dependencies.py    # 依赖注入（get_current_user, require_role）
+│       ├── dependencies.py    # 依赖注入（get_current_user, require_permission）
 │       ├── models/            # SQLAlchemy 模型
 │       │   ├── mixins.py      # TimestampMixin, SoftDeleteMixin, AuditMixin
 │       │   ├── user.py
@@ -90,6 +90,7 @@
 │       │   ├── production.py    # 生产流程：推进/回退/返工/取消/坯布计划
 │       │   ├── notify.py        # 企微通知发送
 │       │   ├── reminder.py      # 定时催办
+│       │   ├── permission.py    # 权限系统（模块级缓存、check_permission、权限定义）
 │       │   └── basic_data.py    # 基础数据 CRUD + 颜色映射查询
 │       ├── api/               # 路由层
 │       │   ├── auth.py
@@ -102,6 +103,7 @@
 │       │   ├── webhook_config.py # 企微webhook配置
 │       │   ├── upload.py
 │       │   ├── basic_data.py
+│       │   ├── permissions.py  # 角色权限管理 CRUD
 │       │   └── public.py       # 公开端点（无需登录）
 │       └── utils/
 │           ├── image_compress.py
@@ -123,9 +125,13 @@
 │       │   ├── basicData.js
 │       │   ├── production.js
 │       │   ├── user.js                    # 用户管理 API
-│       │   └── webhookConfig.js           # Webhook 配置 API
+│       │   ├── webhookConfig.js           # Webhook 配置 API
+│       │   └── permissions.js             # 角色权限 API
 │       ├── store/
-│       │   └── user.js
+│       │   ├── user.js
+│       │   └── permissions.js             # 权限 Pinia store（hasPermission、fetchMyPermissions）
+│       ├── composables/
+│       │   └── usePermission.js           # 权限检查组合式函数
 │       ├── router/
 │       │   └── index.js
 │       ├── components/
@@ -139,7 +145,7 @@
 │           ├── contract/ (ContractList, ContractForm, ContractDetail)
 │           ├── processSheet/ (SheetList, SheetDetail)
 │           ├── basicData/BasicDataList.vue
-│           ├── settings/ (WeComSettings.vue, UserList.vue)
+│           ├── settings/ (WeComSettings.vue, UserList.vue, PermissionMatrix.vue)
 │           └── public/ConfirmPage.vue
 ```
 
@@ -469,30 +475,108 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 - `PUT /webhook-configs/{id}` — 编辑配置
 - `DELETE /webhook-configs/{id}` — 删除配置
 
+### 角色权限 `/api/permissions`
+- `GET /permissions/definitions` — 返回 35 项权限定义（按模块分组，无需登录）
+- `GET /permissions` — 当前角色→权限映射（需 `settings:permissions:manage`）
+- `PUT /permissions` — 更新映射（需 `settings:permissions:manage`，写入 system_config）
+- `GET /permissions/my` — 当前用户角色的权限列表
+
 ## 角色权限
 
-| 功能 | 业务员 | 销售经理 | 生产专员 | 外协人员 |
-|------|--------|---------|---------|---------|
-| 客户/规格 CRUD | 全部 | 全部 | 全部 | 全部 |
-| 合同 CRUD | 仅自己 | 全部 | **403** | **403** |
-| 编辑合同 | 仅自己草稿 | 全部草稿 | 不可 | 不可 |
-| 手动确认合同 | 不可 | 可 | 不可 | 不可 |
-| 请求确认合同 | 可 | - | - | - |
-| 重新打开编辑 | 不可 | 可 | 可 | 不可 |
-| 下推行项目工艺单 | 不可 | 可 | 可 | 不可 |
-| 推进/回退/返工/取消 | 仅取消自己合同 | 全部 | 全部 | 不可 |
-| 恢复取消行项目 | 不可 | 可 | 可 | 不可 |
-| 坯布计划下达 | 不可 | 可 | 可 | 不可 |
-| 查看工艺单 | 仅关联 | 全部 | 全部 | 不可 |
-| 编辑/删除工艺单 | 不可 | 可 | 可 | 不可 |
-| 内部确认 | 不可 | 仅确认人名单中 | 仅确认人名单中 | 不可 |
-| 设置工艺单确认人 | 不可 | 可 | 不可 | 不可 |
-| 重新打开工艺单编辑 | 不可 | 可 | 可 | 不可 |
-| 打印工艺单 PDF | 不可 | 可（V1+） | 可（V1+） | 不可 |
-| 下发工艺单 | 不可 | 可 | 可 | 不可 |
-| 查看我的任务 | - | - | - | 仅自己 |
-| 管理用户 | 不可 | 可 | 不可 | 不可 |
-| 管理 Webhook | 不可 | 可 | 不可 | 不可 |
+### 灵活权限系统
+
+权限存储在 `system_config` 表的 `role_permissions` 键中（JSON 格式），管理员可在 **系统设置 → 角色权限** 中自由勾选。
+
+| 权限项 | key | 初始默认角色 |
+|--------|-----|------------|
+| **合同管理** | | |
+| 查看合同 | contract:view | 业务员、销售经理、生产专员 |
+| 新建合同 | contract:create | 业务员、销售经理 |
+| 编辑合同 | contract:edit | 业务员、销售经理、生产专员 |
+| 删除合同 | contract:delete | 业务员、销售经理 |
+| 请求确认 | contract:request_confirm | 业务员、销售经理 |
+| 手动确认 | contract:manual_confirm | 销售经理 |
+| 重新打开编辑 | contract:reopen_edit | 销售经理、生产专员 |
+| 生成确认图 | contract:generate_confirm_image | 业务员、销售经理 |
+| 查看版本历史 | contract:view_versions | 业务员、销售经理 |
+| 下推行项目到工艺单 | contract:push_down | 销售经理、生产专员 |
+| **工艺单管理** | | |
+| 查看工艺单 | sheet:view | 业务员、销售经理、生产专员 |
+| 新建/下推工艺单 | sheet:create | 销售经理、生产专员 |
+| 编辑工艺单 | sheet:edit | 销售经理、生产专员 |
+| 删除工艺单 | sheet:delete | 销售经理、生产专员 |
+| 客户沟通标记 | sheet:mark_version | 销售经理、生产专员 |
+| 内部确认 | sheet:internal_confirm | 销售经理、生产专员（仅名单中） |
+| 强制通过 | sheet:force_confirm | 销售经理 |
+| 设置内部确认人 | sheet:set_confirm_users | 销售经理 |
+| 下发工艺单 | sheet:dispatch | 销售经理、生产专员 |
+| 打印 PDF | sheet:print | 销售经理、生产专员 |
+| 重新打开编辑 | sheet:reopen_edit | 销售经理、生产专员 |
+| 生成确认链接 | sheet:generate_confirm_link | 销售经理、生产专员 |
+| **生产管理** | | |
+| 管理工序(CRUD) | production:manage_steps | 销售经理、生产专员 |
+| 生产推进 | production:advance | 销售经理、生产专员 |
+| 回退 | production:rollback | 销售经理、生产专员 |
+| 返工 | production:rework | 销售经理、生产专员 |
+| 取消行项目 | production:cancel | 业务员、销售经理、生产专员 |
+| 恢复已取消行项目 | production:restore | 销售经理、生产专员 |
+| 下达坯布计划 | production:yarn_plan | 销售经理、生产专员 |
+| **基础数据** | | |
+| 查看基础数据 | basic_data:view | 全部角色 |
+| 管理基础数据 | basic_data:manage | 销售经理、生产专员 |
+| 管理客户 | customer:manage | 销售经理、生产专员 |
+| 管理规格 | spec:manage | 销售经理、生产专员 |
+| **系统设置** | | |
+| 查看用户列表 | settings:user:view | 销售经理 |
+| 管理用户 | settings:user:manage | 销售经理 |
+| 查看 Webhook | settings:webhook:view | 销售经理 |
+| 管理 Webhook | settings:webhook:manage | 销售经理 |
+| 管理角色权限 | settings:permissions:manage | 销售经理 |
+
+### 后端权限检查机制
+- **API 层**：路由参数 `Depends(require_permission("perm_key"))` 自动拦截无权限请求，返回 403
+- **Service 层**：`check_permission(db, role, permission)` 读取模块级缓存
+- **缓存机制**：首次查询后缓存角色→权限映射，`PUT /api/permissions` 时自动失效
+- **迁移脚本** `migrate_20260630_role_permissions.py` 初始化默认权限
+
+### 前端权限检查机制
+- **Pinia store**：`usePermissionStore.hasPermission('perm_key')` 在登录后自动加载
+- **组件级**：`v-if="permStore.hasPermission('contract:edit')"` 控制按钮/功能显示
+- **路由级**：`meta.roles` 从 JWT 解码检查基础访问，`meta.permissions` 做额外校验（store 加载后生效）
+- **设置页**：`/settings/permissions` 矩阵页面，管理员自由勾选
+
+### 新增角色
+
+当前角色定义有 4 处硬编码，新增角色时需要同步修改：
+
+| 位置 | 文件 | 改动内容 |
+|------|------|----------|
+| 数据库模型 | `backend/app/models/user.py` | `role` 字段的 `ENUM` 追加新角色值 |
+| 迁移脚本 | `backend/migrate_20260630_role_permissions.py` | `DEFAULT_ROLES` 字典加新角色名和默认权限列表 |
+| 权限设置页 | `frontend/src/views/settings/PermissionMatrix.vue` | `const roles = [...]` 数组加新角色 |
+| 路由守卫 | `frontend/src/router/index.js` | 各路由 `meta.roles` 按需添加新角色 |
+
+### 新增功能权限
+
+新增功能（如库存管理、报表等）需要添加对应的权限项：
+
+| 步骤 | 文件 | 改动内容 |
+|------|------|----------|
+| 1 | `backend/app/services/permission.py` | `get_all_permission_definitions()` 中加一条 `{"key": "模块:操作", "label": "说明"}` |
+| 2 | `backend/migrate_20260630_role_permissions.py` | `DEFAULT_ROLES` 中决定哪些角色默认拥有新权限 |
+| 3 | `backend/app/api/xxx.py` | 对应端点加 `Depends(require_permission("模块:操作"))` |
+| 4 | `frontend/src/views/xxx.vue` | 对应按钮/入口加 `v-if="permStore.hasPermission('模块:操作')"` |
+
+### 后续完善方向
+
+如果角色或权限变动频繁，可考虑以下改进：
+
+| 方向 | 说明 | 改动量 |
+|------|------|--------|
+| **角色动态化** | `User.role` 从 ENUM 改为 VARCHAR，角色列表存 `system_config` | 较大（涉及 JWT payload、路由守卫） |
+| **权限定义动态化** | `get_all_permission_definitions()` 移到 `system_config`，设置页支持增删权限 | 中 |
+| **数据权限** | 当前"业务员只能看自己合同"是硬编码的 Service 层逻辑，可拆为 `xxx:view:own` / `xxx:view:all` 两级 | 中 |
+| **迁移脚本改为 seeds** | 用 `get_or_create` 方式追加，避免新增权限时反复改迁移脚本 | 小 |
 
 ## 核心工作流（V2）
 
@@ -596,8 +680,24 @@ cd frontend && npm install && npm run dev
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
 | admin | admin123 | 销售经理 |
-| sales | sales123 | 业务员 |
+| sales | sales123 | 销售经理 |
 | producer | prod123 | 生产专员 |
+
+### 登录流程说明
+
+前端登录页 (`frontend/src/views/login/Login.vue`) 采用表单提交方式：
+
+1. `<el-form>` 绑定 `@submit.prevent="handleLogin"`，登录按钮设置 `native-type="submit"`
+2. 登录前先重置权限 store（`permStore.reset()`），确保切换账号时旧权限数据被清除
+3. 登录成功后直接导航到 `/dashboard`（而非经过 `/` 的 redirect 链）
+4. 防重复提交：`submitting` 标志在第一次 `await` 前设置
+
+### axios 401 拦截器
+
+`frontend/src/api/index.js` 中的 401 拦截器行为：
+- 收到 401 响应 → 清除 localStorage 中的 token → 跳转 `/login`
+- 如果已处于 `/login` 页面则跳过跳转（防止重定向循环）
+- 403（权限不足）不会触发该拦截器，由各组件 catch 自行处理
 
 ### 数据库配置
 ```
@@ -608,11 +708,67 @@ COMPRESS_MAX_WIDTH=1920
 
 ## Docker 部署
 
+### 环境变量
+
+复制 `.env.example` 为 `.env`，修改其中的密码和密钥：
+
 ```bash
-docker-compose up -d
+cp .env.example .env
 ```
 
-部署架构：
-- **MySQL 8.0**: 端口 3306，持久化卷 mysql_data
-- **Backend**: Python FastAPI uvicorn，端口 8000
-- **Frontend**: Nginx 托管 Vue 产物，端口 80，反向代理 /api/ 和 /uploads/ 到后端
+| 变量 | 说明 |
+|------|------|
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码（首次部署前修改）|
+| `SECRET_KEY` | JWT 签名密钥（首次部署前修改为随机字符串）|
+
+### 部署架构
+
+```
+外网 → 服务器:80 → Nginx容器 → 后端容器:8000 → MySQL容器:3306
+                     └── /uploads/ → 后端:8000/uploads
+```
+
+- **MySQL 8.0**: 仅内部网络，不暴露端口
+- **Backend**: Python FastAPI uvicorn，仅内部网络
+- **Frontend**: Nginx 托管 Vue 产物，对外暴露 80 端口，反向代理 /api/ 和 /uploads/
+
+### 一键部署（CentOS）
+
+```bash
+# 首次部署
+bash scripts/deploy.sh init
+
+# 日常更新（git pull + 重建 + 迁移）
+bash scripts/deploy.sh update
+```
+
+首次部署后需在后台 **系统设置 → Webhook** 中配置 `system_base_url`（服务器公网地址），
+公开确认链接功能才能正常工作。
+
+### 手动部署
+
+```bash
+docker compose up -d --build
+docker compose exec backend python init_db.py
+# 按时间顺序执行所有迁移脚本
+docker compose exec backend python migrate_20260629_internal_confirm.py
+docker compose exec backend python migrate_20260629_production_log_process_sheet.py
+docker compose exec backend python migrate_20260630_process_sheet_fields.py
+docker compose exec backend python migrate_20260630_role_permissions.py
+```
+
+### 日常运维
+
+```bash
+# 构建并重启
+docker compose up -d --build
+
+# 查看日志
+docker compose logs -f backend
+
+# 备份数据库
+docker compose exec db mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" huazhi > backup_$(date +%Y%m%d).sql
+
+# 健康检查
+curl http://localhost/api/health
+```

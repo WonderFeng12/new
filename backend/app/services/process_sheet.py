@@ -529,6 +529,7 @@ def internal_confirm_sheet(db: Session, id: int, user) -> dict:
 
     # Determine if all required users have confirmed
     if confirm_ids:
+        required = len(confirm_ids)
         all_confirmed = all(uid in confirmed for uid in confirm_ids)
     else:
         # Fallback to internal_confirm_required for backward compatibility
@@ -582,24 +583,29 @@ def internal_confirm_sheet(db: Session, id: int, user) -> dict:
 
 
 def reopen_sheet_edit(db: Session, id: int, user) -> dict:
-    """Reopen editing after customer/internal confirmation. Like contract reopen, resets status and bumps version."""
+    """Reopen editing from any non-deleted status. Resets to draft, keeps version, restarts confirm flow."""
     from app.models.production_log import ProductionLog
 
     sheet = get_sheet(db, id)
     if not sheet:
         raise HTTPException(status_code=404, detail="工艺单不存在")
-    if sheet.status == "已下发":
-        raise HTTPException(status_code=400, detail="工艺单已下发，不可重新编辑")
-    if not sheet.customer_confirmed and sheet.status == "草稿":
+    if sheet.status == "草稿" and not sheet.customer_confirmed:
         raise HTTPException(status_code=400, detail="客户尚未确认，无需重新编辑")
 
     old_status = sheet.status
 
-    # 回到草稿，重置客户确认状态，版本号保持不变（与合同逻辑一致）
+    # 回到草稿，清空内部确认列表（客户已确认状态保留，无需重复确认），版本号保持不变
     sheet.status = "草稿"
-    sheet.customer_confirmed = False
+    sheet.customer_confirmed = True
     sheet.internal_confirmed_users = []
     sheet.updated_by = user.display_name or user.username
+
+    # 如果已下发，同时恢复合同状态为确认
+    if old_status == "已下发":
+        from app.models.contract import Contract
+        contract = db.query(Contract).filter(Contract.id == sheet.contract_id).first()
+        if contract:
+            contract.status = "确认"
 
     log_remark = "重新打开编辑"
 
@@ -650,6 +656,70 @@ def set_confirm_users(db: Session, id: int, user_ids: list[int], user) -> dict:
 
     sheet.confirm_user_ids = user_ids
     sheet.updated_by = user.display_name or user.username
+    db.commit()
+    db.refresh(sheet)
+    return get_sheet(db, sheet.id)
+
+
+def force_confirm_sheet(db: Session, id: int, user) -> dict:
+    """Force confirm a process sheet, bypassing internal confirmation requirements.
+
+    Only accessible by 销售经理. Skips customer_confirmed check, confirm_user_ids
+    check, and internal_confirmed_users check. Upgrades version and sets status to 保存.
+    """
+    from app.models.production_log import ProductionLog
+    import math
+
+    sheet = get_sheet(db, id)
+    if not sheet:
+        raise HTTPException(status_code=404, detail="工艺单不存在")
+    if sheet.status == "已下发":
+        raise HTTPException(status_code=400, detail="工艺单已下发，不可强制确认")
+
+    old_status = sheet.status
+    old_version = sheet.confirm_version_no
+
+    # Upgrade version to next integer
+    current_v = float(sheet.confirm_version_no or 0)
+    if current_v < 1:
+        new_v = 1.0
+    else:
+        new_v = math.floor(current_v) + 1.0
+    sheet.confirm_version_no = new_v
+
+    # Force complete internal confirmation status
+    sheet.status = "保存"
+    sheet.version_marked = False
+    sheet.customer_confirmed = True
+    sheet.internal_confirmed_users = [user.id]
+    sheet.updated_by = user.display_name or user.username
+
+    username = user.display_name or user.username
+
+    # Log
+    log = ProductionLog(
+        contract_id=sheet.contract_id,
+        process_sheet_id=sheet.id,
+        from_status=old_status,
+        to_status="保存",
+        operation_type="确认",
+        operator_id=user.id,
+        remark=f"强制确认：{username}（版本 V{new_v}）",
+    )
+    db.add(log)
+
+    # WeCom notification
+    try:
+        from app.services.notify import send_message
+        send_message(
+            db,
+            f"工艺单 {sheet.sheet_no} 已被 {username} 强制确认，版本 V{new_v}",
+            mentioned_list=[],
+            webhook_type="工艺单通知",
+        )
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(sheet)
     return get_sheet(db, sheet.id)

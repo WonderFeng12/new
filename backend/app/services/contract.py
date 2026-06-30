@@ -11,6 +11,7 @@ from app.models.process_sheet_item import ProcessSheetItem
 from app.schemas.contract import ContractCreate, ContractUpdate
 from app.schemas.contract_item import ContractItemCreate
 from fastapi import HTTPException
+from app.services.permission import check_permission
 from app.services.production import get_process_sheet_for_item
 
 
@@ -166,6 +167,7 @@ def _enrich_item_sheets(db: Session, items: list):
             item.process_sheet_no = sheet_info["sheet_no"]
             item.process_sheet_status = sheet_info["status"]
             item.process_sheet_version = sheet_info.get("confirm_version_no", 0)
+            item.process_sheet_contract_version = sheet_info.get("process_sheet_contract_version", 0)
         else:
             item.has_process_sheet = False
         if item.yarn_plan_user_id:
@@ -487,7 +489,7 @@ def manual_confirm_contract(db: Session, contract_id: int, user_id: int, remark:
         raise HTTPException(status_code=400, detail="合同已确认")
 
     user = db.query(User).filter(User.id == user_id).first()
-    if not user or (user.role != "销售经理" and user.username != "admin"):
+    if not user or not check_permission(db, user.role, "contract:manual_confirm"):
         raise HTTPException(status_code=403, detail="仅管理员可手动确认")
 
     old_status = contract.status
@@ -536,7 +538,7 @@ def reopen_edit(db: Session, contract_id: int, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    if user.role not in ("销售经理", "生产专员"):
+    if not check_permission(db, user.role, "contract:reopen_edit"):
         raise HTTPException(status_code=403, detail="权限不足")
 
     original_status = contract.status

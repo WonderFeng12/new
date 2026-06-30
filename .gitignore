@@ -7,3 +7,7 @@ dist/
 *.db
 .playwright-mcp/
 test-screenshots/
+.DS_Store
+.claude/
+frontend/.claude/
+*.xlsx

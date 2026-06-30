@@ -11,6 +11,7 @@ from app.models.process_sheet_item import ProcessSheetItem
 from app.models.process_step import ProcessStep
 from app.models.user import User
 from app.services.process_step import get_ordered_step_codes
+from app.services.permission import check_permission
 from app.services.notify import (
     notify_yarn_plan_released,
     notify_production_advance,
@@ -90,7 +91,7 @@ def advance_item(db: Session, item_id: int, user_id: int, remark: str = ""):
     if current == 'weaving' and item.yarn_plan_user_id == user_id:
         has_permission = True
 
-    if not has_permission and user.role not in ('销售经理', '生产专员'):
+    if not has_permission and not check_permission(db, user.role, "production:advance"):
         raise HTTPException(status_code=403, detail="你不是下一工序的负责人")
 
     old_status = item.production_status
@@ -161,7 +162,7 @@ def rollback_item(db: Session, item_id: int, user_id: int, remark: str = ""):
         raise HTTPException(status_code=404, detail="行项目不存在")
 
     user = db.query(User).filter(User.id == user_id).first()
-    if user.role not in ('销售经理', '生产专员'):
+    if not check_permission(db, user.role, "production:rollback"):
         raise HTTPException(status_code=403, detail="权限不足")
 
     ordered = get_ordered_step_codes(db)
@@ -198,7 +199,7 @@ def rework_item(db: Session, item_id: int, target_step: str, user_id: int, remar
         raise HTTPException(status_code=404, detail="行项目不存在")
 
     user = db.query(User).filter(User.id == user_id).first()
-    if user.role not in ('销售经理', '生产专员'):
+    if not check_permission(db, user.role, "production:rework"):
         raise HTTPException(status_code=403, detail="权限不足")
 
     ordered = get_ordered_step_codes(db)
@@ -243,7 +244,7 @@ def cancel_item(
         raise HTTPException(status_code=404, detail="行项目不存在")
 
     user = db.query(User).filter(User.id == user_id).first()
-    if user.role not in ('业务员', '销售经理', '生产专员'):
+    if not check_permission(db, user.role, "production:cancel"):
         raise HTTPException(status_code=403, detail="权限不足")
     # 业务员 can only cancel their own contracts
     if user.role == '业务员':
@@ -348,7 +349,7 @@ def release_yarn_plan(
         raise HTTPException(status_code=400, detail="坯布计划已下达")
 
     user = db.query(User).filter(User.id == user_id).first()
-    if user.role not in ('销售经理', '生产专员'):
+    if not check_permission(db, user.role, "production:yarn_plan"):
         raise HTTPException(status_code=403, detail="权限不足")
 
     yarn_user = db.query(User).filter(User.id == yarn_plan_user_id).first()
@@ -531,11 +532,17 @@ def get_process_sheet_for_item(db: Session, item_id: int) -> dict | None:
     if not sheet_item or not sheet_item.process_sheet or sheet_item.process_sheet.is_deleted:
         return None
     sheet = sheet_item.process_sheet
+    # Extract contract version at push-down time from snapshot
+    contract_version = None
+    snap = sheet.contract_snapshot
+    if isinstance(snap, dict):
+        contract_version = snap.get("latest_confirm_version")
     return {
         "id": sheet.id,
         "sheet_no": sheet.sheet_no,
         "status": sheet.status,
         "confirm_version_no": sheet.confirm_version_no,
+        "process_sheet_contract_version": contract_version,
     }
 
 

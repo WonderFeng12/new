@@ -15,3 +15,4 @@ export function internalConfirmSheet(id) { return api.post(`/process-sheets/${id
 export function reopenSheetEdit(id) { return api.post(`/process-sheets/${id}/reopen-edit`) }
 export function setConfirmRequirements(id, data) { return api.put(`/process-sheets/${id}/confirm-requirements`, data) }
 export function setConfirmUsers(id, user_ids) { return api.put(`/process-sheets/${id}/confirm-users`, user_ids) }
+export function forceConfirmSheet(id) { return api.post(`/process-sheets/${id}/force-confirm`) }

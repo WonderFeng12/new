@@ -4,8 +4,9 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.schemas.contract import ContractCreate, ContractUpdate, ContractOut
 from app.services import contract as service
+from app.services import confirm_image as confirm_image_service
 from app.services.notify import notify_contract_ready_for_confirm
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_permission
 from app.models.user import User
 
 
@@ -19,10 +20,8 @@ router = APIRouter(prefix="/api/contracts", tags=["contracts"])
 def list_all(
     keyword: str = "",
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:view")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.list_contracts(db, keyword, current_user.id, current_user.role)
 
 
@@ -30,20 +29,17 @@ def list_all(
 def next_contract_no(
     customer_id: int = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:create")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
     return {"contract_no": service.generate_contract_no(db, customer_id)}
 
 
 @router.get("/available", response_model=list[ContractOut])
 def list_available(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:view")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     return service.get_available_contracts(db)
 
 
@@ -51,10 +47,9 @@ def list_available(
 def get_one(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:view")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     c = service.get_contract(db, id)
     if not c:
         raise HTTPException(status_code=404, detail="合同不存在")
@@ -65,10 +60,9 @@ def get_one(
 def create(
     data: ContractCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:create")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     return service.create_contract(db, data, current_user.display_name or current_user.username)
 
 
@@ -77,10 +71,9 @@ def update(
     id: int,
     data: ContractUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:edit")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     result = service.update_contract(db, id, data, current_user.display_name or current_user.username, current_user.role)
     if not result:
         raise HTTPException(status_code=404, detail="合同不存在")
@@ -91,10 +84,9 @@ def update(
 def delete(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:delete")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     if not service.delete_contract(db, id):
         raise HTTPException(status_code=404, detail="合同不存在")
     return {"message": "已删除"}
@@ -105,10 +97,9 @@ def manual_confirm(
     id: int,
     data: ManualConfirmRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:manual_confirm")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     if not data.remark or not data.remark.strip():
         raise HTTPException(status_code=400, detail="确认意见不能为空")
     result = service.manual_confirm_contract(db, id, current_user.id, data.remark.strip())
@@ -122,7 +113,7 @@ def request_confirm(
     id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:request_confirm")),
 ):
     """业务员完成合同后，发送企微通知请求销售经理确认。"""
     c = service.get_contract(db, id)
@@ -151,10 +142,55 @@ def request_confirm(
 def reopen_edit(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("contract:reopen_edit")),
 ):
     """重新打开已确认/已下发的合同进行编辑（记录日志）。"""
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
+
     service.reopen_edit(db, id, current_user.id)
     return {"message": "已记录重新编辑操作"}
+
+
+@router.get("/{id}/versions")
+def get_versions(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("contract:view_versions")),
+):
+    """返回确认图版本历史。"""
+
+    versions = confirm_image_service.get_versions(db, id)
+    return [
+        {
+            "id": v.id,
+            "version_no": v.version_no,
+            "generated_at": v.generated_at.isoformat() if v.generated_at else None,
+            "generated_by": v.generated_by,
+            "change_log": v.change_log,
+            "is_confirmed": v.is_confirmed,
+            "confirmed_at": v.confirmed_at.isoformat() if v.confirmed_at else None,
+            "confirmed_by": v.confirmed_by,
+            "image_path": v.image_path,
+        }
+        for v in versions
+    ]
+
+
+@router.post("/{id}/confirm-image")
+def generate_confirm_image(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("contract:generate_confirm_image")),
+):
+    """生成确认图。"""
+
+    username = current_user.display_name or current_user.username
+    image = confirm_image_service.generate_confirm_image(db, id, username, image_path="")
+    return {
+        "id": image.id,
+        "version_no": image.version_no,
+        "generated_at": image.generated_at.isoformat() if image.generated_at else None,
+        "generated_by": image.generated_by,
+        "change_log": image.change_log,
+        "is_confirmed": image.is_confirmed,
+        "image_path": image.image_path,
+    }

@@ -14,7 +14,7 @@
           <el-icon><DataBoard /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
-        <el-menu-item v-if="store.role === '外协人员'" index="/my-tasks">
+        <el-menu-item v-if="permStore.loaded ? permStore.hasPermission('production:advance') : store.role === '外协人员'" index="/my-tasks">
           <el-icon><List /></el-icon>
           <span>我的任务</span>
         </el-menu-item>
@@ -38,16 +38,19 @@
           <el-icon><Tools /></el-icon>
           <span>基础数据</span>
         </el-menu-item>
-        <el-sub-menu v-if="store.role === '销售经理'" index="/settings">
+        <el-sub-menu v-if="showSettings" index="/settings">
           <template #title>
             <el-icon><Tools /></el-icon>
             <span>系统设置</span>
           </template>
-          <el-menu-item index="/settings/users">
+          <el-menu-item v-if="permStore.loaded ? permStore.hasPermission('settings:user:manage') : store.role === '销售经理' || store.role === '管理员'" index="/settings/users">
             <span>用户管理</span>
           </el-menu-item>
-          <el-menu-item index="/settings/wecom">
+          <el-menu-item v-if="permStore.loaded ? permStore.hasPermission('settings:webhook:manage') : store.role === '销售经理' || store.role === '管理员'" index="/settings/wecom">
             <span>企业微信</span>
+          </el-menu-item>
+          <el-menu-item v-if="permStore.loaded ? permStore.hasPermission('settings:permissions:manage') : store.role === '销售经理' || store.role === '管理员'" index="/settings/permissions">
+            <span>角色权限</span>
           </el-menu-item>
         </el-sub-menu>
       </el-menu>
@@ -78,17 +81,28 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from './store/user'
+import { usePermissionStore } from './store/permissions'
 
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
+const permStore = usePermissionStore()
 
 const isLogin = computed(() => route.path === '/login' || route.path.startsWith('/confirm/'))
-const showContracts = computed(() => store.role !== '生产专员')
+const showContracts = computed(() => permStore.loaded ? permStore.hasPermission('contract:view') : store.role !== '生产专员')
+const showSettings = computed(() => permStore.loaded
+  ? (permStore.hasPermission('settings:user:manage') || permStore.hasPermission('settings:webhook:manage') || permStore.hasPermission('settings:permissions:manage'))
+  : ['销售经理', '管理员'].includes(store.role)
+)
 
-onMounted(() => {
+onMounted(async () => {
   if (store.token && !store.user) {
-    store.fetchUser()
+    await store.fetchUser()
+  }
+  if (store.token) {
+    try {
+      await permStore.fetchMyPermissions()
+    } catch {}
   }
 })
 

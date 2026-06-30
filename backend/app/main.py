@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
-from app.api import auth, customers, specs, contracts, upload, process_sheets, basic_data, public, production, users, webhook_config
+from app.api import auth, customers, specs, contracts, upload, process_sheets, basic_data, public, production, users, webhook_config, permissions
 from app.services.reminder import check_contract_reminders
 import os
 
@@ -21,6 +21,7 @@ app.include_router(public.router)
 app.include_router(production.router)
 app.include_router(users.router)
 app.include_router(webhook_config.router)
+app.include_router(permissions.router)
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

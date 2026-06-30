@@ -14,22 +14,32 @@
             <el-tag :type="statusType(sheet?.status)" size="small">{{ sheet?.status }}</el-tag>
             <template v-if="sheet?.status === '草稿' && !sheet?.customer_confirmed">
               <el-button size="small" type="warning" style="margin-left:8px" @click="showMarkDialog = true" :disabled="sheet?.status!=='草稿'" :plain="!!sheet?.version_marked">客户沟通</el-button>
-              <el-button v-if="userStore.role === '销售经理'" size="small" style="margin-left:8px" @click="handleOpenConfirmUsers">设置确认人</el-button>
+              <el-button v-if="permStore.hasPermission('sheet:set_confirm_users')" size="small" style="margin-left:8px" @click="handleOpenConfirmUsers">设置确认人</el-button>
+              <el-popconfirm v-if="permStore.hasPermission('sheet:force_confirm')" title="确定直接确认？将跳过所有审核直接升级版本" @confirm="handleForceConfirm">
+                <template #reference>
+                  <el-button size="small" type="danger" style="margin-left:8px">管理员确认</el-button>
+                </template>
+              </el-popconfirm>
             </template>
             <template v-else-if="sheet?.status === '草稿' && sheet?.customer_confirmed">
               <span style="margin-left:8px;font-size:12px;color:#e6a23c;vertical-align:middle">
                 客户已确认，待内部确认 ({{ internalConfirmCount }}/{{ sheet?.internal_confirm_required || 1 }})
               </span>
               <el-button v-if="canInternalConfirm" size="small" type="success" style="margin-left:8px" @click="handleInternalConfirm">内部确认</el-button>
+              <el-popconfirm v-if="permStore.hasPermission('sheet:force_confirm')" title="确定强制通过？将跳过内部确认直接升级版本" @confirm="handleForceConfirm">
+                <template #reference>
+                  <el-button size="small" type="danger" style="margin-left:8px">强制通过</el-button>
+                </template>
+              </el-popconfirm>
               <el-button v-if="canReopenEdit" size="small" type="danger" plain style="margin-left:8px" @click="handleReopenEdit">重新编辑</el-button>
             </template>
             <template v-else-if="sheet?.status === '保存' || sheet?.status === '已确认'">
               <el-button size="small" type="primary" @click="handleDispatch" :disabled="sheet?.status === '已下发'">下发工艺单</el-button>
               <el-button v-if="canReopenEdit" size="small" type="danger" plain style="margin-left:8px" @click="handleReopenEdit">重新编辑</el-button>
-              <el-button size="small" style="margin-left:8px" @click="handlePrint">打印</el-button>
             </template>
             <template v-if="sheet?.status === '已下发'">
               <el-button size="small" style="margin-left:8px" @click="handlePrint">打印</el-button>
+              <el-button v-if="canReopenEdit" size="small" type="danger" plain style="margin-left:8px" @click="handleReopenEdit">重新编辑</el-button>
             </template>
           </span>
         </div>
@@ -119,6 +129,10 @@
                 当前合同最新版本: {{ formatVersion(contractVersionMatch.current) }} — 建议重新下推
               </p>
             </template>
+          </el-timeline-item>
+          <el-timeline-item v-for="(evt, ei) in reopenEvents" :key="'reopen'+ei" timestamp="重新编辑" :timestamp="evt.created_at || '—'" type="danger" size="large">
+            <p style="margin:0;font-size:12px;color:#666">{{ evt.remark }}</p>
+            <p style="margin:2px 0 0;font-size:12px;color:#999">{{ evt.operator_name || '—' }}</p>
           </el-timeline-item>
           <el-timeline-item v-for="(evt, ei) in commEvents" :key="'comm'+ei" timestamp="客户沟通标记" :timestamp="evt.created_at || '—'" type="warning" size="large">
             <p style="margin:0;font-size:12px;color:#666">{{ evt.remark }}</p>
@@ -481,8 +495,8 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet } from '../../api/processSheet'
-import { useUserStore } from '../../store/user'
+import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet, forceConfirmSheet } from '../../api/processSheet'
+import { usePermissionStore } from '../../store/permissions'
 import { listSpecs } from '../../api/spec'
 import { listUsers } from '../../api/user'
 import { listBasicData, getColorMapping } from '../../api/basicData'
@@ -490,7 +504,7 @@ import { uploadImages } from '../../api/upload'
 import StatusLog from '../../components/StatusLog.vue'
 
 const route = useRoute()
-const userStore = useUserStore()
+const permStore = usePermissionStore()
 const sheet = ref(null)
 const specs = ref([])
 const packagingTypes = ref([])
@@ -502,6 +516,9 @@ const customerConfirmedFromLog = computed(() => {
 })
 const commEvents = computed(() => {
   return logs.value.filter(l => l.remark?.includes('客户沟通标记'))
+})
+const reopenEvents = computed(() => {
+  return logs.value.filter(l => l.operation_type === '重新编辑')
 })
 
 const contractVersionMatch = computed(() => {
@@ -518,11 +535,11 @@ const internalConfirmCount = computed(() => {
 })
 
 const canInternalConfirm = computed(() => {
-  return ['销售经理', '生产专员'].includes(userStore.role)
+  return permStore.hasPermission('sheet:internal_confirm')
 })
 
 const canReopenEdit = computed(() => {
-  return ['销售经理', '生产专员'].includes(userStore.role)
+  return permStore.hasPermission('sheet:reopen_edit')
 })
 
 async function loadLogs() {
@@ -1002,6 +1019,14 @@ async function handleInternalConfirm() {
   try {
     await internalConfirmSheet(route.params.id)
     ElMessage.success('内部确认成功')
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
+}
+
+async function handleForceConfirm() {
+  try {
+    await forceConfirmSheet(route.params.id)
+    ElMessage.success('强制通过成功')
     loadData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '操作失败') }
 }

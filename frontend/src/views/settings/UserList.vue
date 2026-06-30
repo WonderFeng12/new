@@ -20,6 +20,15 @@
             {{ row.wecom_userid || '—' }}
           </template>
         </el-table-column>
+        <el-table-column label="工艺单审批" width="100" align="center">
+          <template #default="{ row }">
+            <el-switch
+              :model-value="approverIds.has(row.id)"
+              @change="(val) => toggleApprover(row.id, val)"
+              size="small"
+            />
+          </template>
+        </el-table-column>
         <el-table-column prop="is_active" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
@@ -43,7 +52,7 @@
 
     <!-- Create/Edit dialog -->
     <el-dialog v-model="formVisible" :title="isEditing ? '编辑用户' : '新增用户'" width="480px">
-      <el-form :model="form" label-width="100px">
+      <el-form :model="form" label-width="110px">
         <el-form-item label="用户名" v-if="!isEditing">
           <el-input v-model="form.username" placeholder="登录名" />
         </el-form-item>
@@ -93,8 +102,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { listUsers, createUser, updateUser, resetPassword, deleteUser } from '../../api/user'
+import { getDefaultConfirmUsers, setDefaultConfirmUsers } from '../../api/production'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
@@ -109,6 +119,9 @@ const pwdVisible = ref(false)
 const resetUserId = ref(null)
 const resetUserName = ref('')
 const newPassword = ref('')
+
+// Default process sheet approvers (user IDs)
+const approverIds = reactive(new Set())
 
 const currentUserId = computed(() => {
   try {
@@ -151,6 +164,23 @@ function openResetPwd(row) {
   resetUserName.value = row.display_name
   newPassword.value = ''
   pwdVisible.value = true
+}
+
+async function toggleApprover(userId, checked) {
+  const ids = new Set(approverIds)
+  if (checked) {
+    ids.add(userId)
+  } else {
+    ids.delete(userId)
+  }
+  try {
+    await setDefaultConfirmUsers({ user_ids: [...ids] })
+    approverIds.clear()
+    for (const id of ids) approverIds.add(id)
+    ElMessage.success(checked ? '已添加工艺单审批人' : '已移除工艺单审批人')
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '操作失败')
+  }
 }
 
 async function handleSave() {
@@ -204,6 +234,7 @@ async function handleResetPwd() {
 async function handleDelete(row) {
   try {
     await deleteUser(row.id)
+    approverIds.delete(row.id)
     ElMessage.success('已删除')
     loadData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '删除失败') }
@@ -212,8 +243,13 @@ async function handleDelete(row) {
 async function loadData() {
   loading.value = true
   try {
-    const res = await listUsers()
+    const [res, confirmRes] = await Promise.all([
+      listUsers(),
+      getDefaultConfirmUsers().catch(() => ({ data: { user_ids: [] } })),
+    ])
     users.value = res.data
+    approverIds.clear()
+    for (const id of (confirmRes.data.user_ids || [])) approverIds.add(id)
   } catch { ElMessage.error('加载失败') }
   finally { loading.value = false }
 }

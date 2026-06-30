@@ -8,7 +8,7 @@ from app.schemas.process_sheet import (
 from app.schemas.production_log import ProductionLogOut
 from app.services import process_sheet as service
 from app.utils.pdf_generator import render_process_sheet, HAS_WEASYPRINT
-from app.dependencies import get_current_user, require_role
+from app.dependencies import get_current_user, require_permission
 from app.models.user import User
 from app.models.production_log import ProductionLog
 
@@ -40,10 +40,8 @@ def get_one(
 def create(
     data: ProcessSheetCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:create")),
 ):
-    if current_user.role == "业务员":
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.create_sheet_from_items(
         db, data.contract_id, data.contract_item_ids,
         current_user.display_name or current_user.username
@@ -55,10 +53,8 @@ def update_detail(
     id: int,
     data: ProcessSheetUpdateDetail,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:edit")),
 ):
-    if current_user.role == "业务员":
-        raise HTTPException(status_code=403, detail="权限不足")
     items_data = [i.model_dump(exclude_unset=True) for i in data.items] if data.items else None
     return service.update_sheet_detail(
         db, id, data.detail_data, items_data,
@@ -93,10 +89,8 @@ def confirm(
 def internal_confirm(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:internal_confirm")),
 ):
-    if current_user.role not in ("销售经理", "生产专员"):
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.internal_confirm_sheet(db, id, current_user)
 
 
@@ -104,11 +98,18 @@ def internal_confirm(
 def reopen_edit(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:reopen_edit")),
 ):
-    if current_user.role not in ("销售经理", "生产专员"):
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.reopen_sheet_edit(db, id, current_user)
+
+
+@router.post("/{id}/force-confirm", response_model=ProcessSheetOut)
+def force_confirm(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("sheet:force_confirm")),
+):
+    return service.force_confirm_sheet(db, id, current_user)
 
 
 @router.put("/{id}/confirm-requirements", response_model=ProcessSheetOut)
@@ -116,10 +117,8 @@ def set_confirm_reqs(
     id: int,
     required_count: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:set_confirm_users")),
 ):
-    if current_user.role != "销售经理":
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.set_confirm_requirements(db, id, required_count, current_user)
 
 
@@ -127,7 +126,7 @@ def set_confirm_reqs(
 def dispatch(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:dispatch")),
 ):
     return service.dispatch_sheet(db, id, current_user.display_name or current_user.username)
 
@@ -136,7 +135,7 @@ def dispatch(
 def print_sheet(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("销售经理", "生产专员")),
+    current_user: User = Depends(require_permission("sheet:print")),
 ):
     sheet = service.get_sheet(db, id)
     if not sheet:
@@ -153,7 +152,7 @@ def print_sheet(
 def delete(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:delete")),
 ):
     if not service.delete_sheet(db, id):
         raise HTTPException(status_code=404, detail="工艺单不存在")
@@ -185,10 +184,8 @@ def set_confirm_users(
     id: int,
     user_ids: list[int],
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:set_confirm_users")),
 ):
-    if current_user.role != "销售经理":
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.set_confirm_users(db, id, user_ids, current_user)
 
 
@@ -196,8 +193,6 @@ def set_confirm_users(
 def generate_sheet_confirm_link(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("sheet:generate_confirm_link")),
 ):
-    if current_user.role == "生产专员":
-        raise HTTPException(status_code=403, detail="权限不足")
     return service.generate_confirm_link(db, id)
