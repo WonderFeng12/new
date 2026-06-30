@@ -750,7 +750,7 @@ function onDetailChange() {
 function updateTechNote1() {
   const spec = firstSpec.value
   if (spec) {
-    detailData.tech_note_1 = `请注意尺寸和重量控制:${spec.length}*${spec.width}cm,重量:${spec.weight}-3~+1之间`
+    detailData.tech_note_1 = `请注意尺寸和重量控制:${spec.length}*${spec.width}cm,重量:${spec.weight}-3%~+1%之间`
   } else {
     detailData.tech_note_1 = '请注意尺寸和重量控制'
   }
