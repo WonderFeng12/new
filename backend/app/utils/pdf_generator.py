@@ -95,7 +95,6 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         p_remark = i.process_remark or ""
 
         # Pattern images + info
-        pattern_images = []
         pattern_data = i.pattern_data or []
         if isinstance(pattern_data, str):
             try:
@@ -103,27 +102,61 @@ def render_process_sheet(sheet, contract, items) -> bytes:
             except (json.JSONDecodeError, TypeError):
                 pattern_data = []
 
-        pattern_img_html = ""
-        for pd_item in pattern_data:
-            if isinstance(pd_item, dict):
-                img = pd_item.get("image", "")
-                code = pd_item.get("code", "") or ""
-                color = pd_item.get("color", "") or ""
-                binding_no = pd_item.get("binding_color_no", "") or ""
-                if img:
-                    info_parts = []
-                    if code:
-                        info_parts.append(code)
-                    if color:
-                        info_parts.append(f"颜色:{color}")
-                    if binding_no:
-                        info_parts.append(f"色号:{binding_no}")
-                    info_str = " | ".join(info_parts)
-                    pattern_img_html += f'<div style="display:inline-block;text-align:center;margin:1px 4px 1px 0;vertical-align:top">'
-                    pattern_img_html += _img_tag(img, "花型", w=60, h=60)
-                    if info_str:
-                        pattern_img_html += f'<div style="font-size:6.5pt;color:#555;line-height:1.2;max-width:60px;word-wrap:break-word">{info_str}</div>'
-                    pattern_img_html += "</div>"
+        # Filter to items that have images
+        pattern_items = [p for p in pattern_data if isinstance(p, dict) and p.get("image")]
+
+        # Determine if composite spec
+        is_composite = i.spec and i.spec.layer_type and "复合" in i.spec.layer_type
+
+        # Build pattern grid (3 columns)
+        pattern_grid_html = ""
+        pressed_path = getattr(i, "pressed_image", None) or ""
+
+        if pattern_items:
+            if is_composite:
+                # Group as A/B pairs: (1A,1B), (2A,2B), (3A,3B)...
+                pairs = [pattern_items[j:j+2] for j in range(0, len(pattern_items), 2)]
+                groups = pairs
+            else:
+                # Each item is its own group
+                groups = [[p] for p in pattern_items]
+
+            pattern_grid_html = '<table style="width:100%;border-collapse:collapse">'
+            for row_start in range(0, len(groups), 3):
+                row_groups = groups[row_start:row_start + 3]
+                pattern_grid_html += '<tr>'
+                for gi, grp in enumerate(row_groups):
+                    pattern_grid_html += '<td style="width:33%;border:none;vertical-align:top;text-align:center'
+                    if gi > 0:
+                        pattern_grid_html += ';border-left:1px dashed #ccc;padding-left:4px'
+                    pattern_grid_html += '">'
+                    for pd_item in grp:
+                        img = pd_item.get("image", "")
+                        code = pd_item.get("code", "") or ""
+                        color = pd_item.get("color", "") or ""
+                        binding_no = pd_item.get("binding_color_no", "") or ""
+                        info_parts = []
+                        if code:
+                            info_parts.append(code)
+                        if color:
+                            info_parts.append(f"颜色:{color}")
+                        if binding_no:
+                            info_parts.append(f"色号:{binding_no}")
+                        info_str = " | ".join(info_parts)
+                        pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:1px 3px;vertical-align:top">'
+                        pattern_grid_html += _img_tag(img, "花型", w=55, h=55)
+                        if info_str:
+                            pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.1;word-wrap:break-word;max-width:55px">{info_str}</div>'
+                        pattern_grid_html += '</div>'
+                    pattern_grid_html += '</td>'
+                # Fill remaining columns
+                for _ in range(3 - len(row_groups)):
+                    pattern_grid_html += '<td style="width:33%;border:none"></td>'
+                pattern_grid_html += '</tr>'
+            # Last row: pressed image
+            if pressed_path:
+                pattern_grid_html += f'<tr><td colspan="3" style="border:none;text-align:center;padding-top:3px;border-top:1px solid #eee"><span style="font-size:7pt;color:#888">压花:</span>{_img_tag(pressed_path, "压花", w=55, h=55)}</td></tr>'
+            pattern_grid_html += '</table>'
 
         # A/B side images
         a_images = []
@@ -137,19 +170,14 @@ def render_process_sheet(sheet, contract, items) -> bytes:
             if val:
                 b_images.append(val)
 
-        # Pressed image
-        pressed_path = getattr(i, "pressed_image", None) or ""
-
         # Build image row
         imgs_html = ""
-        if pattern_img_html:
-            imgs_html += f'<span style="font-size:7pt;color:#888;margin-right:2px">花型:</span>{pattern_img_html}'
+        if pattern_grid_html:
+            imgs_html += pattern_grid_html
         if a_images:
-            imgs_html += f'<span style="font-size:7pt;color:#888;margin:0 2px">A面:</span>{_img_cell(a_images, "A面")}'
+            imgs_html += f'<div style="margin-top:2px"><span style="font-size:7pt;color:#888">A面:</span>{_img_cell(a_images, "A面")}</div>'
         if b_images:
-            imgs_html += f'<span style="font-size:7pt;color:#888;margin:0 2px">B面:</span>{_img_cell(b_images, "B面")}'
-        if pressed_path:
-            imgs_html += f'<span style="font-size:7pt;color:#888;margin:0 2px">压花:</span>{_img_tag(pressed_path, "压花", w=55, h=55)}'
+            imgs_html += f'<div style="margin-top:1px"><span style="font-size:7pt;color:#888">B面:</span>{_img_cell(b_images, "B面")}</div>'
 
         if imgs_html:
             imgs_html = f'<tr><td colspan="6" style="padding:2px 5px;border-top:none">{imgs_html}</td></tr>'
@@ -189,8 +217,8 @@ def render_process_sheet(sheet, contract, items) -> bytes:
 
     def _label_cell(label_name, label_item):
         img_html = _img_cell(label_item.get("images", []), label_name)
-        size = label_item.get("size", "") or ""
-        qty = label_item.get("qty", "") or ""
+        size = str(label_item.get("size", "") or "")
+        qty = str(label_item.get("qty", "") or "")
         if not size and not qty and not img_html:
             return ""
         cell = f'<strong style="font-size:7.5pt">{label_name}</strong>'
@@ -207,6 +235,15 @@ def render_process_sheet(sheet, contract, items) -> bytes:
 
     # 包贴彩卡 (idx 1) — spans 2 cols and 2 rows
     c1 = _acc_cell(1)
+    baotie_idx = 1
+    if not c1:
+        # Fallback: search other indices for 包贴彩卡 data
+        for idx in range(2, 7):
+            desc = detail.get(f"accessory_desc_{idx}", "") or ""
+            if "包贴彩卡" in desc or "包贴" in desc:
+                c1 = _acc_cell(idx)
+                baotie_idx = idx
+                break
     has_baotie = bool(c1)
 
     # Row 1: 洗标 | 产地标 | 包贴彩卡(colspan=2, rowspan=2)
@@ -220,9 +257,11 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         if c:
             row1_leading.append(c)
 
-    # Row 2: 钢丝袋 | 真空包 (最多2个)
+    # Row 2: 钢丝袋 | 真空包 (最多2个), skip baotie_idx to avoid duplication
     row2_cells = []
     for idx in [3, 4, 2, 5, 6]:
+        if idx == baotie_idx:
+            continue
         c = _acc_cell(idx)
         if c:
             row2_cells.append(c)
@@ -253,9 +292,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         accessories_html = f'<table style="width:100%;border-collapse:collapse">{rows_html}</table>'
 
     # ── Notes ──
-    tech_notes = _notes_html(detail, "tech_note", 10)
-    pack_notes = _notes_html(detail, "pack_note", 5)
-    box_notes = _notes_html(detail, "box_note", 3)
+    tech_notes = _notes_html(detail, "tech_note", 21)
+    pack_notes = _notes_html(detail, "pack_note", 21)
+    box_notes = _notes_html(detail, "box_note", 21)
 
     # ── Version and date ──
     version_str = format_version(sheet.confirm_version_no)

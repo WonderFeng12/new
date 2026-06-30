@@ -73,7 +73,7 @@
 
       <el-divider>行项目</el-divider>
 
-      <el-table :data="items" stripe size="small">
+      <el-table :data="items" stripe size="small" :row-class-name="tableRowClassName">
         <el-table-column prop="line_no" label="行号" width="60" />
         <el-table-column label="毛毯规格" width="180">
           <template #default="{ row }">
@@ -101,10 +101,12 @@
         <el-table-column label="交货日期" width="100">
           <template #default="{ row }">{{ row.delivery_date || '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row, $index }">
-            <el-button size="small" type="primary" text :disabled="sheet?.status !== '草稿'" @click="openItemDetail($index)">明细</el-button>
-            <el-button size="small" type="danger" text :disabled="sheet?.status !== '草稿'" @click="removeItem($index)">删除</el-button>
+            <el-button v-if="isEditing" size="small" type="primary" text @click="openItemDetail($index)">明细</el-button>
+            <el-button v-else size="small" text @click="openItemDetail($index)">查看</el-button>
+            <el-button v-if="canRestoreItem(row)" size="small" type="warning" text @click="handleRestoreItem(row)">恢复</el-button>
+            <el-button v-else-if="canCancelItem(row)" size="small" type="danger" text @click="openCancelItemDialog(row)">取消</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -204,7 +206,7 @@
     </el-card>
 
     <!-- 行项目明细对话框 -->
-    <el-dialog v-model="showDetailDialog" :title="'行项目明细 - 第' + (activeIdx + 1) + '行'" width="900px" destroy-on-close>
+    <el-dialog v-model="showDetailDialog" :title="(isEditing ? '行项目明细' : '查看行项目明细') + ' - 第' + (activeIdx + 1) + '行'" width="900px" destroy-on-close>
       <template v-if="activeItem">
         <el-tabs type="border-card">
           <el-tab-pane label="花型颜色">
@@ -223,37 +225,44 @@
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="包边材料">
-                    <el-input v-model="detailData.binding_material" :disabled="isBindingDisabled" />
+                    <el-input v-model="detailData.binding_material" :disabled="!isEditing || isBindingDisabled" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="包边宽度">
-                    <el-input v-model="detailData.binding_width" :disabled="isBindingDisabled" />
+                    <el-input v-model="detailData.binding_width" :disabled="!isEditing || isBindingDisabled" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="20">
                 <el-col :span="8">
                   <el-form-item label="是否压花">
-                    <el-switch v-model="activeItem.is_pressed" @change="onItemFieldChange" />
+                    <el-switch v-model="activeItem.is_pressed" @change="onItemFieldChange" :disabled="!isEditing" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <div style="display:flex;align-items:center;flex-wrap:wrap">
-                    <el-button size="small" @click="triggerEmbossUpload">上传压花图片</el-button>
-                    <div v-if="activeItem.pressed_image" style="position:relative;display:inline-block;margin-left:8px">
-                      <img :src="activeItem.pressed_image" style="width:60px;height:60px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />
-                      <div v-if="activeItem.pressed_image_name" style="font-size:10px;color:#666;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ activeItem.pressed_image_name }}</div>
-                      <el-button size="small" circle style="position:absolute;top:-6px;right:-6px;padding:0;width:16px;height:16px;background:#f56c6c;color:#fff;border:none;font-size:10px;line-height:16px;min-height:auto" @click="removeEmbossImage">×</el-button>
-                    </div>
+                    <el-button v-if="isEditing" size="small" @click="triggerEmbossUpload">上传压花图片</el-button>
+                    <template v-if="activeItem.pressed_image?.length">
+                      <div v-for="(img, ei) in activeItem.pressed_image" :key="ei" style="position:relative;display:inline-block;margin:4px">
+                        <img :src="img" style="width:60px;height:60px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />
+                        <div v-if="activeItem.pressed_image_name?.[ei]" style="font-size:10px;color:#666;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ stripExt(activeItem.pressed_image_name[ei]) }}</div>
+                        <el-button v-if="isEditing" size="small" circle style="position:absolute;top:-6px;right:-6px;padding:0;width:16px;height:16px;background:#f56c6c;color:#fff;border:none;font-size:10px;line-height:16px;min-height:auto" @click="removeEmbossImage(ei)">×</el-button>
+                      </div>
+                    </template>
                   </div>
-                  <input type="file" ref="embossUploadRef" accept=".jpg,.jpeg,.png,.bmp" style="display:none" @change="onEmbossFileSelected" />
+                  <input type="file" ref="embossUploadRef" accept=".jpg,.jpeg,.png,.bmp" multiple style="display:none" @change="onEmbossFileSelected" />
                 </el-col>
               </el-row>
               <el-row :gutter="20">
                 <el-col :span="8">
                   <el-form-item label="花型个数">
-                    <el-input-number v-model="activeItem.pattern_count" :min="0" :max="20" size="small" style="width:120px" @change="onPatternCountChange" />
+                    <el-input-number v-model="activeItem.pattern_count" :min="0" :max="20" size="small" style="width:120px" @change="onPatternCountChange" :disabled="!isEditing" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="交货日期">
+                    <el-date-picker v-model="activeItem.delivery_date" type="date" value-format="YYYY-MM-DD" style="width:100%" :disabled="!isEditing" @change="onItemFieldChange" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -263,19 +272,19 @@
                   <el-row :gutter="8" type="flex" align="middle">
                     <el-col :span="7" style="display:flex;align-items:center;min-height:40px;padding-left:0!important">
                       <el-form-item :label="getPatternLabel(pi, activeItem)" label-width="100px" label-style="padding-left:0" style="margin-bottom:0">
-                        <el-input v-model="p.code" />
+                        <el-input v-model="p.code" :disabled="!isEditing" />
                       </el-form-item>
                     </el-col>
                     <el-col :span="4" style="display:flex;align-items:center;min-height:40px">
                       <el-form-item label="颜色" label-width="50px" style="margin-bottom:0">
-                        <el-select v-model="p.color" filterable clearable style="width:100%" @change="(val) => onPatternColorChange(pi, val)">
+                        <el-select v-model="p.color" filterable clearable style="width:100%" @change="(val) => onPatternColorChange(pi, val)" :disabled="!isEditing">
                           <el-option v-for="(v, k) in colorMapping" :key="k" :label="k" :value="k" />
                         </el-select>
                       </el-form-item>
                     </el-col>
                     <el-col :span="4" style="display:flex;align-items:center;min-height:40px">
                       <el-form-item label="数量" label-width="50px" style="margin-bottom:0">
-                        <el-input-number v-model="p.qty" :min="0" :precision="0" size="small" style="width:100%" :controls="false" />
+                        <el-input-number v-model="p.qty" :min="0" :precision="0" size="small" style="width:100%" :controls="false" :disabled="!isEditing" />
                       </el-form-item>
                     </el-col>
                     <el-col :span="4" style="display:flex;align-items:center;min-height:40px">
@@ -292,10 +301,10 @@
                   <el-row :gutter="8" style="margin-top:8px">
                     <el-col>
                       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                        <el-button size="small" @click="triggerPatternUpload(pi)">上传图片</el-button>
+                        <el-button v-if="isEditing" size="small" @click="triggerPatternUpload(pi)">上传图片</el-button>
                         <div v-if="p.image" style="position:relative;display:inline-block">
                           <img :src="p.image" style="width:80px;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />
-                          <el-button size="small" circle style="position:absolute;top:-8px;right:-8px;padding:0;width:20px;height:20px;background:#f56c6c;color:#fff;border:none;font-size:12px;line-height:20px;min-height:auto" @click="removePatternImage(pi)">×</el-button>
+                          <el-button v-if="isEditing" size="small" circle style="position:absolute;top:-8px;right:-8px;padding:0;width:20px;height:20px;background:#f56c6c;color:#fff;border:none;font-size:12px;line-height:20px;min-height:auto" @click="removePatternImage(pi)">×</el-button>
                         </div>
                       </div>
                     </el-col>
@@ -317,13 +326,13 @@
                     {{ washOriginLabels[sub.key] }}
                   </el-col>
                   <el-col :span="9" style="text-align:left">
-                    <el-input v-model="subItems(sub.key)[0].size" placeholder="尺寸(cm) 如 10*15" @change="onDetailChange" />
+                    <el-input v-model="subItems(sub.key)[0].size" placeholder="尺寸(cm) 如 10*15" @change="onDetailChange" :disabled="!isEditing" />
                   </el-col>
                   <el-col :span="8" style="text-align:left">
-                    <el-input v-model="subItems(sub.key)[0].qty" placeholder="数量" @change="onDetailChange" />
+                    <el-input v-model="subItems(sub.key)[0].qty" placeholder="数量" @change="onDetailChange" :disabled="!isEditing" />
                   </el-col>
                   <el-col :span="4" style="text-align:left">
-                    <el-button size="small" @click="triggerSubUpload(sub.key, 0)">上传图片</el-button>
+                    <el-button v-if="isEditing" size="small" @click="triggerSubUpload(sub.key, 0)">上传图片</el-button>
                     <input type="file" :ref="el => setSubRef(sub.key, 0, el)" accept=".jpg,.jpeg,.png,.bmp" style="display:none" multiple @change="onSubFileSelected(sub.key, 0, $event)" />
                   </el-col>
                 </el-row>
@@ -331,7 +340,7 @@
                   <el-col v-for="(img, iidx) in (subItems(sub.key)[0].images || [])" :key="iidx" :xs="8" :sm="8" :md="6" :lg="4" style="margin-bottom:8px">
                     <div style="position:relative;display:inline-block;width:100%">
                       <img :src="img" style="width:100%;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />
-                      <el-button size="small" circle style="position:absolute;top:-8px;right:-8px;padding:0;width:20px;height:20px;background:#f56c6c;color:#fff;border:none;font-size:12px;line-height:20px;min-height:auto" @click="removeSubImg(sub.key, 0, iidx)">×</el-button>
+                      <el-button v-if="isEditing" size="small" circle style="position:absolute;top:-8px;right:-8px;padding:0;width:20px;height:20px;background:#f56c6c;color:#fff;border:none;font-size:12px;line-height:20px;min-height:auto" @click="removeSubImg(sub.key, 0, iidx)">×</el-button>
                     </div>
                   </el-col>
                 </el-row>
@@ -341,13 +350,13 @@
               <el-row :gutter="12" type="flex" align="middle" justify="center">
                 <el-col :span="3" style="text-align:left;line-height:32px;font-weight:bold;white-space:nowrap">{{ grp.label }}</el-col>
                 <el-col :span="9" style="text-align:left">
-                  <el-input v-model="detailData[`accessory_size_${grp.key}`]" placeholder="尺寸(cm) 如 10*15" @change="onDetailChange" />
+                  <el-input v-model="detailData[`accessory_size_${grp.key}`]" placeholder="尺寸(cm) 如 10*15" @change="onDetailChange" :disabled="!isEditing" />
                 </el-col>
                 <el-col :span="8" style="text-align:left">
-                  <el-input v-model="detailData[`accessory_qty_${grp.key}`]" placeholder="数量" @change="onDetailChange" />
+                  <el-input v-model="detailData[`accessory_qty_${grp.key}`]" placeholder="数量" @change="onDetailChange" :disabled="!isEditing" />
                 </el-col>
                 <el-col :span="4" style="text-align:left">
-                  <el-button size="small" @click="triggerAccUpload(grp.key)">上传图片</el-button>
+                  <el-button v-if="isEditing" size="small" @click="triggerAccUpload(grp.key)">上传图片</el-button>
                   <input type="file" :ref="el => setAccRef(grp.key, el)" accept=".jpg,.jpeg,.png,.bmp" style="display:none" multiple @change="onAccFileSelected(grp.key, $event)" />
                 </el-col>
               </el-row>
@@ -355,7 +364,7 @@
                 <el-col v-for="(img, idx) in (detailData[`accessory_images_${grp.key}`] || [])" :key="idx" :xs="8" :sm="8" :md="6" :lg="4" style="margin-bottom:8px">
                   <div style="position:relative;display:inline-block;width:100%">
                     <img :src="img" style="width:100%;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />
-                    <el-button size="small" circle style="position:absolute;top:-8px;right:-8px;padding:0;width:20px;height:20px;background:#f56c6c;color:#fff;border:none;font-size:12px;line-height:20px;min-height:auto" @click="removeAccImg(grp.key, idx)">×</el-button>
+                    <el-button v-if="isEditing" size="small" circle style="position:absolute;top:-8px;right:-8px;padding:0;width:20px;height:20px;background:#f56c6c;color:#fff;border:none;font-size:12px;line-height:20px;min-height:auto" @click="removeAccImg(grp.key, idx)">×</el-button>
                   </div>
                 </el-col>
               </el-row>
@@ -365,35 +374,35 @@
           <el-tab-pane label="技术要求">
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.tech_note_1" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.tech_note_1" type="textarea" :rows="2" @change="onDetailChange" :disabled="!isEditing" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.tech_note_2" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.tech_note_2" type="textarea" :rows="2" @change="onDetailChange" :disabled="!isEditing" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.tech_note_3" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.tech_note_3" type="textarea" :rows="2" @change="onDetailChange" :disabled="!isEditing" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.tech_note_4" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.tech_note_4" type="textarea" :rows="2" @change="onDetailChange" :disabled="!isEditing" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.tech_note_5" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.tech_note_5" type="textarea" :rows="2" @change="onDetailChange" :disabled="!isEditing" />
               </el-col>
             </el-row>
             <el-row :gutter="20" v-for="i in extraTechNoteCount" :key="'extra'+(5+i)" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData[`tech_note_${5+i}`]" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData[`tech_note_${5+i}`]" type="textarea" :rows="2" @change="onDetailChange" :disabled="!isEditing" />
               </el-col>
             </el-row>
-            <el-row :gutter="20">
+            <el-row v-if="isEditing" :gutter="20">
               <el-col :span="24">
                 <el-button type="primary" text @click="addTechNote">+ 新增技术说明</el-button>
               </el-col>
@@ -404,49 +413,49 @@
             <el-divider>包装 (3项)</el-divider>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.pack_note_1" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.pack_note_1" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.pack_note_2" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.pack_note_2" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.pack_note_3" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.pack_note_3" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20" v-for="i in extraPackNoteCount" :key="'extraPn'+(3+i)" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData[`pack_note_${3+i}`]" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData[`pack_note_${3+i}`]" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20">
               <el-col :span="24">
-                <el-button type="primary" text @click="addPackNote">+ 新增包装说明</el-button>
+                <el-button v-if="isEditing" type="primary" text @click="addPackNote">+ 新增包装说明</el-button>
               </el-col>
             </el-row>
 
             <el-divider>包装箱要求 (2项)</el-divider>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.box_note_1" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.box_note_1" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData.box_note_2" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData.box_note_2" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20" v-for="i in extraBoxNoteCount" :key="'extraBn'+(2+i)" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-input v-model="detailData[`box_note_${2+i}`]" type="textarea" :rows="2" @change="onDetailChange" />
+                <el-input v-model="detailData[`box_note_${2+i}`]" type="textarea" :rows="2" :disabled="!isEditing" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20">
               <el-col :span="24">
-                <el-button type="primary" text @click="addBoxNote">+ 新增箱单说明</el-button>
+                <el-button v-if="isEditing" type="primary" text @click="addBoxNote">+ 新增箱单说明</el-button>
               </el-col>
             </el-row>
 
@@ -454,7 +463,7 @@
         </el-tabs>
       </template>
       <template #footer>
-        <el-button type="primary" @click="saveItemDetail">保存</el-button>
+        <el-button v-if="isEditing" type="primary" @click="saveItemDetail">保存</el-button>
         <el-button @click="showDetailDialog = false">关闭</el-button>
       </template>
     </el-dialog>
@@ -521,6 +530,19 @@
         <el-button type="primary" @click="confirmChangeNote" :disabled="!changeNote.trim()">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 取消行项目对话框 -->
+    <el-dialog v-model="cancelItemDialogVisible" title="取消行项目" width="420px">
+      <el-form>
+        <el-form-item label="取消原因">
+          <el-input v-model="cancelItemReason" type="textarea" :rows="2" placeholder="请输入取消原因" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="cancelItemDialogVisible = false">取消</el-button>
+        <el-button type="danger" @click="confirmCancelItem">确认取消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -528,7 +550,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet, forceConfirmSheet } from '../../api/processSheet'
+import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet, forceConfirmSheet, cancelSheetItem, restoreSheetItem } from '../../api/processSheet'
 import { usePermissionStore } from '../../store/permissions'
 import { listSpecs } from '../../api/spec'
 import { listUsers } from '../../api/user'
@@ -611,6 +633,43 @@ function addBoxNote() {
   if (!detailData[`box_note_${key}`]) {
     detailData[`box_note_${key}`] = ''
   }
+}
+
+const isEditing = computed(() => sheet.value?.status === '草稿')
+
+// Cancel item state
+const cancelItemDialogVisible = ref(false)
+const cancelItemTarget = ref(null)
+const cancelItemReason = ref('')
+
+function canCancelItem(row) {
+  return sheet.value?.status === '草稿' && !row.cancel_reason
+}
+function canRestoreItem(row) {
+  return sheet.value?.status === '草稿' && row.cancel_reason && !(row.cancel_quantities?.restored)
+}
+function tableRowClassName({ row }) {
+  return row.cancel_reason ? 'cancelled-row' : ''
+}
+function openCancelItemDialog(row) {
+  cancelItemTarget.value = row
+  cancelItemReason.value = ''
+  cancelItemDialogVisible.value = true
+}
+async function confirmCancelItem() {
+  try {
+    await cancelSheetItem(route.params.id, cancelItemTarget.value.id, { reason: cancelItemReason.value || '无' })
+    ElMessage.success('已取消')
+    cancelItemDialogVisible.value = false
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '取消失败') }
+}
+async function handleRestoreItem(row) {
+  try {
+    await restoreSheetItem(route.params.id, row.id)
+    ElMessage.success('已恢复')
+    loadData()
+  } catch (e) { ElMessage.error(e.response?.data?.detail || '恢复失败') }
 }
 
 // Detail dialog state
@@ -829,19 +888,35 @@ function removePatternImage(index) {
 function triggerEmbossUpload() { embossUploadRef.value?.click() }
 
 async function onEmbossFileSelected(event) {
-  const file = event.target.files?.[0]
-  if (!file || !activeItem.value) return
+  const files = Array.from(event.target.files || [])
+  if (!files.length || !activeItem.value) return
   try {
-    const res = await uploadImages([file])
-    if (res.data?.[0]) {
-      activeItem.value.pressed_image = res.data[0].url
-      activeItem.value.pressed_image_name = res.data[0].original_name || file.name
+    const res = await uploadImages(files)
+    if (res.data?.length) {
+      if (!Array.isArray(activeItem.value.pressed_image)) activeItem.value.pressed_image = []
+      if (!Array.isArray(activeItem.value.pressed_image_name)) activeItem.value.pressed_image_name = []
+      res.data.forEach(img => {
+        activeItem.value.pressed_image.push(img.url)
+        activeItem.value.pressed_image_name.push(img.original_name || '')
+      })
     }
   } catch { ElMessage.error('图片上传失败') }
   event.target.value = ''
 }
 
-function removeEmbossImage() { if (activeItem.value) activeItem.value.pressed_image = '' }
+function removeEmbossImage(index) {
+  if (!activeItem.value?.pressed_image) return
+  activeItem.value.pressed_image.splice(index, 1)
+  if (activeItem.value.pressed_image_name) {
+    activeItem.value.pressed_image_name.splice(index, 1)
+  }
+}
+
+function stripExt(name) {
+  if (!name) return ''
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(0, dot) : name
+}
 
 // Accessory image uploads
 function setAccRef(key, el) { if (el) accRefs[key] = el }
@@ -1002,8 +1077,8 @@ async function saveItemDetail() {
         image_b_1: i.image_b_1 || '',
         image_b_2: i.image_b_2 || '',
         image_b_3: i.image_b_3 || '',
-        pressed_image: i.pressed_image || '',
-        pressed_image_name: i.pressed_image_name || '',
+        pressed_image: i.pressed_image || null,
+        pressed_image_name: i.pressed_image_name || null,
         process_remark: i.process_remark || '',
         remark: i.remark || '',
         qty: i.qty,
@@ -1271,3 +1346,12 @@ onMounted(async () => {
   loadLogs()
 })
 </script>
+
+<style scoped>
+.el-table .cancelled-row {
+  color: #f56c6c;
+}
+.el-table .cancelled-row td.el-table__cell {
+  color: #f56c6c;
+}
+</style>

@@ -199,7 +199,10 @@ def _build_sheet_change_summary(detail_data: dict, old_detail: dict,
                 new_pc = new_it.get("pattern_count", 0) or 0
                 if old_pc != new_pc:
                     item_changes.append(f"花型数({old_pc}→{new_pc})")
-                if new_it.get("pressed_image") and getattr(old_it, "pressed_image", "") != new_it["pressed_image"]:
+                import json as _json
+                old_pi = getattr(old_it, "pressed_image", None)
+                new_pi = new_it.get("pressed_image")
+                if old_pi and new_pi and _json.dumps(old_pi, sort_keys=True, default=str) != _json.dumps(new_pi, sort_keys=True, default=str):
                     item_changes.append("压花图片")
                 if item_changes:
                     changes.append(f"行{ln}# {'，'.join(item_changes)}")
@@ -723,3 +726,70 @@ def force_confirm_sheet(db: Session, id: int, user) -> dict:
     db.commit()
     db.refresh(sheet)
     return get_sheet(db, sheet.id)
+
+
+def cancel_sheet_item(db: Session, item_id: int, user_id: int, reason: str, quantities: dict | None = None):
+    """Cancel a process sheet item."""
+    from app.models.production_log import ProductionLog
+
+    item = db.query(ProcessSheetItem).filter(ProcessSheetItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="工艺单行项目不存在")
+    if item.cancel_reason:
+        raise HTTPException(status_code=400, detail="该行项目已取消")
+
+    snapshot = dict(quantities or {})
+    snapshot.update({
+        "qty": float(item.qty or 0),
+        "detail": reason,
+        "restored": False,
+    })
+    item.cancel_reason = reason
+    item.cancel_quantities = snapshot
+
+    log = ProductionLog(
+        contract_id=item.process_sheet.contract_id,
+        contract_item_id=item.contract_item_id,
+        process_sheet_id=item.process_sheet_id,
+        from_status=None,
+        to_status="cancelled",
+        operation_type="取消",
+        operator_id=user_id,
+        remark=f"工艺单行项目取消：{reason}",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(item)
+    return item, log
+
+
+def restore_sheet_item(db: Session, item_id: int, user_id: int):
+    """Restore a cancelled process sheet item."""
+    from app.models.production_log import ProductionLog
+
+    item = db.query(ProcessSheetItem).filter(ProcessSheetItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="工艺单行项目不存在")
+    if not item.cancel_reason:
+        raise HTTPException(status_code=400, detail="该行项目未取消")
+    snap = item.cancel_quantities or {}
+    if snap.get("restored"):
+        raise HTTPException(status_code=400, detail="该行项目已恢复")
+
+    item.cancel_reason = None
+    item.cancel_quantities = {**snap, "restored": True}
+
+    log = ProductionLog(
+        contract_id=item.process_sheet.contract_id,
+        contract_item_id=item.contract_item_id,
+        process_sheet_id=item.process_sheet_id,
+        from_status="cancelled",
+        to_status=None,
+        operation_type="取消",
+        operator_id=user_id,
+        remark="已恢复取消：行项目恢复到取消前状态",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(item)
+    return item, log

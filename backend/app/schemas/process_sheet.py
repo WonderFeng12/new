@@ -30,11 +30,13 @@ class ProcessSheetItemOut(BaseModel):
     image_b_1: Optional[str] = None
     image_b_2: Optional[str] = None
     image_b_3: Optional[str] = None
-    pressed_image: Optional[str] = None
-    pressed_image_name: Optional[str] = None
+    pressed_image: Optional[list[str]] = None
+    pressed_image_name: Optional[list[str]] = None
     remark: Optional[str] = None
     process_remark: Optional[str] = None
     qty: Optional[float] = 0
+    cancel_reason: Optional[str] = None
+    cancel_quantities: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -56,7 +58,8 @@ class ProcessSheetUpdateItem(BaseModel):
     image_b_1: Optional[str] = None
     image_b_2: Optional[str] = None
     image_b_3: Optional[str] = None
-    pressed_image: Optional[str] = None
+    pressed_image: Optional[list[str]] = None
+    pressed_image_name: Optional[list[str]] = None
     remark: Optional[str] = None
     qty: Optional[float] = None
 

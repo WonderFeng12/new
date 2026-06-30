@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 from app.database import get_db
 from app.schemas.process_sheet import (
     ProcessSheetCreate, ProcessSheetOut, ProcessSheetUpdateDetail, MarkVersionRequest
@@ -11,6 +13,11 @@ from app.utils.pdf_generator import render_process_sheet, HAS_WEASYPRINT
 from app.dependencies import get_current_user, require_permission
 from app.models.user import User
 from app.models.production_log import ProductionLog
+
+
+class CancelSheetItemRequest(BaseModel):
+    reason: str = "无"
+    quantities: Optional[dict] = None
 
 router = APIRouter(prefix="/api/process-sheets", tags=["process-sheets"])
 
@@ -196,3 +203,26 @@ def generate_sheet_confirm_link(
     current_user: User = Depends(require_permission("sheet:generate_confirm_link")),
 ):
     return service.generate_confirm_link(db, id)
+
+
+@router.post("/{sheet_id}/items/{item_id}/cancel")
+def cancel_sheet_item(
+    sheet_id: int,
+    item_id: int,
+    req: CancelSheetItemRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("sheet:edit")),
+):
+    item, log = service.cancel_sheet_item(db, item_id, current_user.id, req.reason, req.quantities)
+    return {"message": "已取消", "item_id": item.id}
+
+
+@router.post("/{sheet_id}/items/{item_id}/restore")
+def restore_sheet_item(
+    sheet_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("sheet:edit")),
+):
+    item, log = service.restore_sheet_item(db, item_id, current_user.id)
+    return {"message": "已恢复", "item_id": item.id}

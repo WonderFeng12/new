@@ -15,6 +15,8 @@ MIGRATIONS=(
   "migrate_20260629_production_log_process_sheet.py"
   "migrate_20260630_process_sheet_fields.py"
   "migrate_20260630_role_permissions.py"
+  "migrate_20260630_process_sheet_item_cancel.py"
+  "migrate_20260701_pressed_images_json.py"
 )
 
 color_green='\033[0;32m'

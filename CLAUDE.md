@@ -273,8 +273,12 @@
 | color_a / color_b | 颜色 |
 | image_a_1~3 / image_b_1~3 | 图片 |
 | qty | 数量 |
+| pressed_image(JSON) | 压花图片URL列表（多图）|
+| pressed_image_name(JSON) | 压花图片原始文件名列表 |
 | process_remark | 工艺备注 |
 | remark | 备注 |
+| cancel_reason | TEXT 取消原因 |
+| cancel_quantities(JSON) | 取消快照（含 restored 标志）|
 
 ### 工序 (process_step)
 | 字段 | 类型 | 说明 |
@@ -397,6 +401,9 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 | B035 | 已取消行项目不可下推工艺单或下达坯布计划（按钮灰化） | ContractDetail.vue → canPushDown / canReleaseYarn |
 | B036 | 创建合同时自动记录 operation_type='创建' 的日志 | contract service → create_contract |
 | B037 | 编辑合同时自动对比变更字段，生成详细摘要写入日志 remark | contract service → update_contract → _build_change_summary |
+| B043 | 工艺单行项目取消/恢复：取消时保存快照写 ProductionLog，恢复时清 cancel_reason 标记 restored | process_sheet service → cancel_sheet_item / restore_sheet_item |
+| B044 | 工艺单下发后操作列显示"查看"非编辑只读对话框，所有输入框 disabled，保存/上传/新增按钮隐藏 | SheetDetail.vue → isEditing computed |
+| B045 | 工艺单行项目压花图片支持多图上传存储为 JSON 数组，文件名去后缀显示 | SheetDetail.vue + migrate_20260701_pressed_images_json.py |
 
 ## API 端点
 
@@ -436,6 +443,8 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 - `DELETE /process-sheets/{id}` — 删除（恢复行项目下推状态）
 - `POST /process-sheets/{id}/generate-confirm-link` — 生成客户确认链接
 - `GET /process-sheets/{id}/logs` — 工艺单操作日志列表（按时间降序）
+- `POST /process-sheets/{sheet_id}/items/{item_id}/cancel` — 取消工艺单行项目（快照数量+原因）
+- `POST /process-sheets/{sheet_id}/items/{item_id}/restore` — 恢复已取消的工艺单行项目
 
 ### 生产流程 `/api` (production router)
 - `GET /process-steps` — 工序列表
@@ -736,10 +745,10 @@ cp .env.example .env
 
 ```bash
 # 首次部署
-bash scripts/deploy.sh init
+cd /root/new/repo && bash scripts/deploy.sh init
 
 # 日常更新（git pull + 重建 + 迁移）
-bash scripts/deploy.sh update
+cd /root/new/repo && bash scripts/deploy.sh update
 ```
 
 首次部署后需在后台 **系统设置 → Webhook** 中配置 `system_base_url`（服务器公网地址），
@@ -755,6 +764,8 @@ docker compose exec backend python migrate_20260629_internal_confirm.py
 docker compose exec backend python migrate_20260629_production_log_process_sheet.py
 docker compose exec backend python migrate_20260630_process_sheet_fields.py
 docker compose exec backend python migrate_20260630_role_permissions.py
+docker compose exec backend python migrate_20260630_process_sheet_item_cancel.py
+docker compose exec backend python migrate_20260701_pressed_images_json.py
 ```
 
 ### 日常运维
