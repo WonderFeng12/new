@@ -165,6 +165,7 @@
           <div style="font-weight:bold;margin-bottom:4px">行{{ item.line_no }}: {{ getSpecName(item.spec_id) }}</div>
           <div v-if="item.pattern_data?.length">
             <div v-for="(p, pi) in item.pattern_data" :key="pi" style="display:flex;gap:8px;align-items:center;margin:4px 0;padding:4px 8px;background:#f5f7fa;border-radius:4px">
+              <span style="font-size:12px;font-weight:bold;min-width:85px">{{ getPatternLabel(pi, item) }}</span>
               <el-tag size="small">{{ p.code }}</el-tag>
               <span style="font-size:12px;color:#666">颜色: {{ p.color || '无色' }}</span>
               <span style="font-size:12px;color:#666">数量: ×{{ p.qty }}</span>
@@ -262,7 +263,7 @@
                 <div v-for="(p, pi) in activeItem.pattern_data" :key="pi" style="border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:8px">
                   <el-row :gutter="8" type="flex" align="middle">
                     <el-col :span="7" style="display:flex;align-items:center;min-height:40px;padding-left:0">
-                      <el-form-item :label="'花型代码' + (pi + 1)" label-width="85px" label-style="padding-left:0" style="margin-bottom:0">
+                      <el-form-item :label="getPatternLabel(pi, activeItem)" label-width="85px" label-style="padding-left:0" style="margin-bottom:0">
                         <el-input v-model="p.code" />
                       </el-form-item>
                     </el-col>
@@ -659,6 +660,17 @@ const accessories = computed(() => {
 function getSpecName(specId) {
   const spec = specs.value.find(s => s.id === specId)
   return spec ? spec.spec_description || spec.spec_name : `规格#${specId}`
+}
+
+function getPatternLabel(index, item) {
+  const spec = specs.value.find(s => s.id === item.spec_id)
+  const isComposite = spec?.layer_type?.includes('复合')
+  if (isComposite) {
+    const num = Math.floor(index / 2) + 1
+    const suffix = index % 2 === 0 ? 'A' : 'B'
+    return `花型代码${num}${suffix}`
+  }
+  return `花型代码${index + 1}`
 }
 
 function statusType(s) {
