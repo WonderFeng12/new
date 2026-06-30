@@ -184,6 +184,13 @@ def create_contract(db: Session, data: ContractCreate, username: str):
     data_dict["updated_by"] = username
     if not data_dict.get("contract_no"):
         data_dict["contract_no"] = generate_contract_no(db)
+    else:
+        existing = db.query(Contract).filter(
+            Contract.contract_no == data_dict["contract_no"],
+            Contract.is_deleted == False,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"合同编号 '{data_dict['contract_no']}' 已存在")
 
     contract = Contract(**data_dict)
     db.add(contract)
@@ -379,6 +386,16 @@ def update_contract(db: Session, id: int, data: ContractUpdate, username: str, u
 
     for field, value in data.model_dump(exclude_unset=True, exclude={"items"}).items():
         setattr(contract, field, value)
+
+    # Check contract_no uniqueness on update
+    if data.contract_no is not None:
+        dup = db.query(Contract).filter(
+            Contract.contract_no == data.contract_no,
+            Contract.is_deleted == False,
+            Contract.id != id,
+        ).first()
+        if dup:
+            raise HTTPException(status_code=400, detail=f"合同编号 '{data.contract_no}' 已存在")
 
     if items_data is not None:
         from app.schemas.contract_item import ContractItemUpdateWithId

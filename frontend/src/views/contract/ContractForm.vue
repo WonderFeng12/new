@@ -15,7 +15,7 @@
               </el-col>
               <el-col :span="8">
                 <el-form-item label="合同编号">
-                  <el-input v-model="form.contract_no" placeholder="选择客户后自动生成" @input="(val) => form.contract_no = val.toUpperCase()" disabled />
+                  <el-input v-model="form.contract_no" placeholder="选择客户后自动生成，也可手动输入" @input="(val) => form.contract_no = val.toUpperCase()" />
                 </el-form-item>
               </el-col>
               <el-col :span="8">
