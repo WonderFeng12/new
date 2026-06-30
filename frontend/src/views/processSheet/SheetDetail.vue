@@ -366,30 +366,37 @@
           <el-tab-pane label="技术要求">
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-form-item label="1">
-                  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;width:100%;line-height:32px">
-                    <span>请注意尺寸和重量控制:</span>
-                    <span style="font-weight:bold">{{ specDimText }}</span>
-                    <span>±</span>
-                    <el-input v-model="detailData.tolerance" style="width:70px;display:inline-block" size="small" @change="updateTechNote1" />
-                    <span>cm, 重量:</span>
-                    <span style="font-weight:bold">{{ specWeightText }}</span>
-                  </div>
-                </el-form-item>
+                <el-input v-model="detailData.tech_note_1" type="textarea" :rows="2" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20" style="margin-bottom:12px">
               <el-col :span="24">
-                <el-form-item label="2">
-                  <el-input v-model="detailData.tech_note_2" type="textarea" :rows="2" placeholder="2.质量要求,手感厚实,毛面爽滑光亮,不掉毛" @change="onDetailChange" />
-                </el-form-item>
+                <el-input v-model="detailData.tech_note_2" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.tech_note_3" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.tech_note_4" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData.tech_note_5" type="textarea" :rows="2" @change="onDetailChange" />
+              </el-col>
+            </el-row>
+            <el-row :gutter="20" v-for="i in extraTechNoteCount" :key="'extra'+(5+i)" style="margin-bottom:12px">
+              <el-col :span="24">
+                <el-input v-model="detailData[`tech_note_${5+i}`]" type="textarea" :rows="2" @change="onDetailChange" />
               </el-col>
             </el-row>
             <el-row :gutter="20">
-              <el-col :span="12" v-for="i in [3,4,5,6,7,8,9,10]" :key="'tn'+i">
-                <el-form-item :label="''+i">
-                  <el-input v-model="detailData[`tech_note_${i}`]" type="textarea" :rows="2" @change="onDetailChange" />
-                </el-form-item>
+              <el-col :span="24">
+                <el-button type="primary" text @click="addTechNote">+ 新增技术说明</el-button>
               </el-col>
             </el-row>
           </el-tab-pane>
@@ -553,6 +560,15 @@ async function loadLogs() {
 // Items and detail data (reactive copies for editing)
 const items = ref([])
 const detailData = reactive({})
+const extraTechNoteCount = ref(0)
+
+function addTechNote() {
+  extraTechNoteCount.value++
+  const key = 5 + extraTechNoteCount.value
+  if (!detailData[`tech_note_${key}`]) {
+    detailData[`tech_note_${key}`] = ''
+  }
+}
 
 // Detail dialog state
 const showDetailDialog = ref(false)
@@ -734,9 +750,9 @@ function onDetailChange() {
 function updateTechNote1() {
   const spec = firstSpec.value
   if (spec) {
-    detailData.tech_note_1 = `1.请注意尺寸和重量控制:${spec.length}*${spec.width}mm,±${detailData.tolerance || '1'}cm,重量:${spec.weight}`
+    detailData.tech_note_1 = `请注意尺寸和重量控制:${spec.length}*${spec.width}cm,重量:${spec.weight}-3~+1之间`
   } else {
-    detailData.tech_note_1 = '1.请注意尺寸和重量控制'
+    detailData.tech_note_1 = '请注意尺寸和重量控制'
   }
 }
 
@@ -1102,21 +1118,26 @@ async function loadData() {
     // Deep-copy items and detail_data for editing
     items.value = JSON.parse(JSON.stringify(res.data.items || []))
     const dd = res.data.detail_data || {}
+    // Count existing extra tech notes
+    const maxTechNote = Math.max(...Object.keys(dd).filter(k => /^tech_note_\d+$/.test(k)).map(k => parseInt(k.split('_')[2])).filter(n => n > 5), 5)
+    extraTechNoteCount.value = Math.max(0, maxTechNote - 5)
+    // Copy extra tech note values into detailData directly
+    for (let i = 6; i <= maxTechNote; i++) {
+      if (dd[`tech_note_${i}`]) {
+        detailData[`tech_note_${i}`] = dd[`tech_note_${i}`]
+      }
+    }
+
     Object.assign(detailData, {
       binding_material: dd.binding_material || '',
       binding_width: dd.binding_width || '',
       binding_color_no: dd.binding_color_no || '',
       tolerance: dd.tolerance || '1',
       tech_note_1: dd.tech_note_1 || '',
-      tech_note_2: dd.tech_note_2 || '2.质量要求,手感厚实,毛面爽滑光亮,不掉毛',
-      tech_note_3: dd.tech_note_3 || '',
-      tech_note_4: dd.tech_note_4 || '',
-      tech_note_5: dd.tech_note_5 || '',
-      tech_note_6: dd.tech_note_6 || '',
-      tech_note_7: dd.tech_note_7 || '',
-      tech_note_8: dd.tech_note_8 || '',
-      tech_note_9: dd.tech_note_9 || '',
-      tech_note_10: dd.tech_note_10 || '',
+      tech_note_2: dd.tech_note_2 || '质量要求,手感厚实,毛面爽滑光亮,不掉毛.',
+      tech_note_3: dd.tech_note_3 || '缝制要求:每条毛毯缝制一个洗标和一个产地标,洗标缝在繁忙长边左下角距边20cm处,产地标重叠缝制在下面',
+      tech_note_4: dd.tech_note_4 || '辅料:',
+      tech_note_5: dd.tech_note_5 || '贴纸贴在抽真空包装上,拆卡插入钢丝包的内插袋口袋',
       accessory_desc_1: dd.accessory_desc_1 || '',
       accessory_size_1: dd.accessory_size_1 || '',
       accessory_qty_1: dd.accessory_qty_1 || null,
@@ -1177,6 +1198,7 @@ onMounted(async () => {
     colorMapping.value = cmRes.data || {}
   } catch {}
   await loadData()
+  if (!detailData.tech_note_1) updateTechNote1()
   loadLogs()
 })
 </script>
