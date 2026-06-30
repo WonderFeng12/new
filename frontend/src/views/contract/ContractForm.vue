@@ -319,7 +319,7 @@ async function handleSave() {
 
 onMounted(async () => {
   try {
-    const [cRes, sRes, ltRes, ptRes] = await Promise.all([listCustomers(), listSpecs(), listBasicData('layer_type'), listBasicData('packaging_type')])
+    const [cRes, sRes, ltRes, ptRes] = await Promise.all([listCustomers(), listSpecs(), listBasicData('layer_type'), listBasicData('packing')])
     customers.value = cRes.data
     specs.value = sRes.data
     layerTypes.value = ltRes.data || []
