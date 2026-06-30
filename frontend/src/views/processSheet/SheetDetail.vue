@@ -910,6 +910,14 @@ function openItemDetail(index) {
     const pkg = items.value[index]?.packaging_type || '包装'
     detailData.pack_note_1 = `每${pkg}条毛毯+只钢丝插好彩页`
   }
+  // Set default binding material and width
+  if (!detailData.binding_material) {
+    detailData.binding_material = '110gsm针织布'
+  }
+  if (!detailData.binding_width) {
+    const spec = specs.value.find(s => s.id === items.value[index]?.spec_id)
+    detailData.binding_width = spec?.layer_type?.includes('复合') ? '8cm' : '5cm'
+  }
   showDetailDialog.value = true
 }
 
