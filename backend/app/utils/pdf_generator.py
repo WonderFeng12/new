@@ -59,11 +59,11 @@ def _img_tag(path, alt="", w=60, h=60):
     return f'<img src="{resolved}" alt="{alt}" style="max-width:{w}px;max-height:{h}px;object-fit:contain;border:1px solid #ccc;border-radius:2px;margin:1px">'
 
 
-def _img_cell(paths, alt_prefix=""):
+def _img_cell(paths, alt_prefix="", size=55):
     tags = []
     for p in paths:
         if p:
-            t = _img_tag(p, alt_prefix, w=55, h=55)
+            t = _img_tag(p, alt_prefix, w=size, h=size)
             if t:
                 tags.append(t)
     if not tags:
@@ -126,9 +126,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 row_groups = groups[row_start:row_start + 3]
                 pattern_grid_html += '<tr>'
                 for gi, grp in enumerate(row_groups):
-                    pattern_grid_html += '<td style="width:33%;border:none;vertical-align:top;text-align:center'
+                    pattern_grid_html += '<td style="width:33%;border:none;vertical-align:top;text-align:center;padding:3px'
                     if gi > 0:
-                        pattern_grid_html += ';border-left:1px dashed #ccc;padding-left:4px'
+                        pattern_grid_html += ';border-left:1px dashed #ccc;padding-left:6px'
                     pattern_grid_html += '">'
                     for pd_item in grp:
                         img = pd_item.get("image", "")
@@ -143,8 +143,8 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                         if binding_no:
                             info_parts.append(f"色号:{binding_no}")
                         info_str = " | ".join(info_parts)
-                        pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:1px 3px;vertical-align:top">'
-                        pattern_grid_html += _img_tag(img, "花型", w=55, h=55)
+                        pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:2px 4px;vertical-align:top">'
+                        pattern_grid_html += _img_tag(img, "花型", w=86, h=86)
                         if info_str:
                             pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.1;word-wrap:break-word;max-width:55px">{info_str}</div>'
                         pattern_grid_html += '</div>'
@@ -155,7 +155,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 pattern_grid_html += '</tr>'
             # Last row: pressed image
             if pressed_path:
-                pattern_grid_html += f'<tr><td colspan="3" style="border:none;text-align:center;padding-top:3px;border-top:1px solid #eee"><span style="font-size:7pt;color:#888">压花:</span>{_img_tag(pressed_path, "压花", w=55, h=55)}</td></tr>'
+                pattern_grid_html += f'<tr><td colspan="3" style="border:none;text-align:center;padding-top:4px;border-top:1px solid #eee"><span style="font-size:7pt;color:#888">压花:</span>{_img_tag(pressed_path, "压花", w=86, h=86)}</td></tr>'
             pattern_grid_html += '</table>'
 
         # A/B side images
@@ -175,9 +175,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         if pattern_grid_html:
             imgs_html += pattern_grid_html
         if a_images:
-            imgs_html += f'<div style="margin-top:2px"><span style="font-size:7pt;color:#888">A面:</span>{_img_cell(a_images, "A面")}</div>'
+            imgs_html += f'<div style="margin-top:3px"><span style="font-size:7.5pt;color:#888">A面:</span>{_img_cell(a_images, "A面")}</div>'
         if b_images:
-            imgs_html += f'<div style="margin-top:1px"><span style="font-size:7pt;color:#888">B面:</span>{_img_cell(b_images, "B面")}</div>'
+            imgs_html += f'<div style="margin-top:2px"><span style="font-size:7.5pt;color:#888">B面:</span>{_img_cell(b_images, "B面")}</div>'
 
         if imgs_html:
             imgs_html = f'<tr><td colspan="6" style="padding:2px 5px;border-top:none">{imgs_html}</td></tr>'
@@ -305,6 +305,15 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     contract_no = _snap_val(snap, "contract_no", contract.contract_no if contract else "")
     contract_date = _snap_val(snap, "contract_date", str(contract.contract_date) if contract and contract.contract_date else "")
     delivery_date = items[0].delivery_date if items and items[0].delivery_date else detail.get("delivery_date", "") or ""
+
+    # ── Process description (same logic as frontend: spec_name + 经编印花 + pressed + 毛毯-包装方式) ──
+    first_item = items[0] if items else None
+    process_desc = ""
+    if first_item:
+        sn = first_item.spec.spec_name if first_item.spec else ""
+        pressed_flag = "压花" if first_item.is_pressed else ""
+        pkg = first_item.packaging_type or ""
+        process_desc = f"{sn}经编印花{pressed_flag}毛毯-{pkg}" if sn else ""
 
     # ── Binding / emboss ──
     binding_material = detail.get("binding_material", "") or ""
@@ -470,7 +479,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         <tr>
             <th>合同日期</th><td>{contract_date}</td>
             <th>交货日期</th><td>{delivery_date}</td>
-            <th></th><td></td>
+            <td colspan="2" style="font-size:7.5pt">{process_desc}</td>
         </tr>
     </table>
 
@@ -536,5 +545,5 @@ def _acc_images(detail, idx):
         except (json.JSONDecodeError, TypeError):
             return ""
     if isinstance(val, list):
-        return _img_cell(val[:3])
+        return _img_cell(val[:3], size=82)
     return ""
