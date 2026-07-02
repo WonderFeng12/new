@@ -116,54 +116,59 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 pairs = [pattern_items[j:j+2] for j in range(0, len(pattern_items), 2)]
                 groups = pairs
             else:
-                # Group items in pairs so 2 items stack vertically per grid cell
-                groups = [pattern_items[j:j+2] for j in range(0, len(pattern_items), 2)]
+                groups = [[p] for p in pattern_items]
 
             pattern_count = int(i.pattern_count or len(pattern_data) or 1)
             qty_per = float(i.qty or 0) / pattern_count if pattern_count else 0
             qty_str = f'{qty_per:.1f}' if qty_per else ''
 
+            sep = '<span style="color:#bbb;margin:0 1px">|</span>'
+
             def _item_table(pd_item):
                 code = pd_item.get("code", "") or ""
                 color = pd_item.get("color", "") or ""
                 binding_no = pd_item.get("binding_color_no", "") or ""
-                line1_parts = []
+                line1 = ''
                 if code:
-                    line1_parts.append(f'花型:{code}')
+                    line1 += f'花型:{code}'
                 if qty_str:
-                    line1_parts.append(f'数量:{qty_str}条')
-                line2_parts = []
+                    if line1:
+                        line1 += f' {sep} '
+                    line1 += f'数量:{qty_str}条'
+                line2 = ''
                 if color:
-                    line2_parts.append(f'颜色:{color}')
+                    line2 += f'颜色:{color}'
                 if binding_no:
-                    line2_parts.append(f'色号:{binding_no}')
-                info = '<br>'.join([' '.join(line1_parts), ' '.join(line2_parts)])
+                    if line2:
+                        line2 += f' {sep} '
+                    line2 += f'色号:{binding_no}'
+                info = '<br>'.join([line1, line2]) if line1 or line2 else ''
                 img_src = _resolve_image_path(pd_item.get("image", ""))
                 if not img_src:
                     return ""
-                img = f'<img src="{img_src}" style="height:42pt;width:auto;margin:0 auto;display:block;border:1px solid #ccc;border-radius:2px">'
-                return f'''<div style="text-align:center;margin:1px 0">
+                img = f'<img src="{img_src}" style="width:100%;height:auto;display:block;border:1px solid #ccc;border-radius:2px">'
+                return f'''<div style="text-align:center">
                   <div>{img}</div>
-                  <div style="font-size:5.5pt;color:#555;line-height:1.3">{info}</div>
+                  <div style="font-size:5.5pt;color:#555;line-height:1.3;padding:1px 0">{info}</div>
                 </div>'''
 
             pattern_grid_html = '<table style="width:100%;border-collapse:separate;border-spacing:0;border:none">'
-            col_count = 5
+            col_count = 3
             for row_start in range(0, len(groups), col_count):
                 row_groups = groups[row_start:row_start + col_count]
                 pattern_grid_html += '<tr>'
                 for gi, grp in enumerate(row_groups):
                     is_last = (gi == len(row_groups) - 1)
                     brd = 'border:none;border-right:1px dashed #ccc;' if not is_last else 'border:none;'
-                    pattern_grid_html += f'<td style="width:{100/col_count:.1f}%;{brd}vertical-align:top;text-align:center;padding:2px 0">'
+                    pattern_grid_html += f'<td style="width:{100/col_count:.1f}%;{brd}vertical-align:top;text-align:center;padding:0">'
                     if is_composite and len(grp) == 2:
-                        # A/B pair: use a 2-column table to guarantee side-by-side
+                        # A/B pair: side by side, each fills 50% sub-cell
                         a_html = _item_table(grp[0])
                         b_html = _item_table(grp[1])
                         pattern_grid_html += f'''<table style="width:100%;border:none;border-collapse:collapse">
                           <tr>
-                            <td style="width:50%;border:none;vertical-align:top;text-align:center;padding:1px 0">{a_html}</td>
-                            <td style="width:50%;border:none;vertical-align:top;text-align:center;padding:1px 0">{b_html}</td>
+                            <td style="width:50%;border:none;vertical-align:top;text-align:center;padding:1px">{a_html}</td>
+                            <td style="width:50%;border:none;vertical-align:top;text-align:center;padding:1px">{b_html}</td>
                           </tr>
                         </table>'''
                     else:
@@ -172,7 +177,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                     pattern_grid_html += '</td>'
                 for fi in range(col_count - len(row_groups)):
                     brd = 'border:none;border-right:1px dashed #ccc;' if fi < (col_count - len(row_groups) - 1) else 'border:none;'
-                    pattern_grid_html += f'<td style="width:{100/col_count:.1f}%;{brd}vertical-align:top;padding:2px 0"></td>'
+                    pattern_grid_html += f'<td style="width:{100/col_count:.1f}%;{brd}vertical-align:top;padding:0"></td>'
                 pattern_grid_html += '</tr>'
             pattern_grid_html += '</table>'
 
