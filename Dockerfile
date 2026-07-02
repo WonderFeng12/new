@@ -6,7 +6,7 @@ RUN sed -i 's|deb.debian.org|mirrors.tencent.com|g' /etc/apt/sources.list.d/debi
     sed -i 's|security.debian.org|mirrors.tencent.com/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
-    libffi-dev shared-mime-info && \
+    libffi-dev shared-mime-info fonts-wqy-zenhei && \
     rm -rf /var/lib/apt/lists/* && \
     true
 

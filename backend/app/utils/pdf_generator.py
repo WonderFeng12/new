@@ -337,7 +337,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     @page {{ @bottom-center {{ content: counter(page) " / " counter(pages); font-size: 7pt; color: #999; }} }}
 
     body {{
-        font-family: 'SimSun', 'Noto Serif CJK SC', 'Source Han Serif SC', 'STSong', 'AR PL New Sung', 'FangSong', serif;
+        font-family: 'WenQuanYi Zen Hei', 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', 'STSong', 'FangSong', 'AR PL New Sung', serif;
         font-size: 8.5pt;
         color: #222;
         line-height: 1.35;
