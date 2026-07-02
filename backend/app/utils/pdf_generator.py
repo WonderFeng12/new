@@ -197,7 +197,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
             imgs_html += f'<div style="margin-top:2px"><span style="font-size:7.5pt;color:#888">B面:</span>{_img_cell(b_images, "B面")}</div>'
 
         if imgs_html:
-            imgs_html = f'<tr><td colspan="7" style="padding:2px 5px;border-top:none">{imgs_html}</td></tr>'
+            imgs_html = f'<tr><td colspan="7" style="padding:2px 5px;border:none">{imgs_html}</td></tr>'
 
         item_rows += f"""
         <tr>
