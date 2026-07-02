@@ -4,6 +4,7 @@ services:
     ports:
       - "3308:3306"
     environment:
+      TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: huazhi
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
@@ -21,6 +22,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
+      TZ: Asia/Shanghai
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/huazhi?charset=utf8mb4
       SECRET_KEY: ${SECRET_KEY}
     volumes:

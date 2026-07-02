@@ -110,7 +110,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
 
         # Build pattern grid (3 columns)
         pattern_grid_html = ""
-        pressed_path = getattr(i, "pressed_image", None) or ""
+        pressed_path = getattr(i, "pressed_image", None) or []
+        if isinstance(pressed_path, str):
+            pressed_path = [pressed_path]
 
         if pattern_items:
             if is_composite:
@@ -153,9 +155,10 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 for _ in range(3 - len(row_groups)):
                     pattern_grid_html += '<td style="width:33%;border:none"></td>'
                 pattern_grid_html += '</tr>'
-            # Last row: pressed image
+            # Last row: pressed images (multi-image support)
             if pressed_path:
-                pattern_grid_html += f'<tr><td colspan="3" style="border:none;text-align:center;padding-top:4px;border-top:1px solid #eee"><span style="font-size:7pt;color:#888">压花:</span>{_img_tag(pressed_path, "压花", w=86, h=86)}</td></tr>'
+                pressed_imgs = "".join(_img_tag(p, "压花", w=86, h=86) for p in pressed_path if p)
+                pattern_grid_html += f'<tr><td colspan="3" style="border:none;text-align:center;padding-top:4px;border-top:1px solid #eee"><span style="font-size:7pt;color:#888">压花:</span>{pressed_imgs}</td></tr>'
             pattern_grid_html += '</table>'
 
         # A/B side images
@@ -323,8 +326,11 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     # Pressed image name from first item that has one
     pressed_name = ""
     for i in items:
-        pn = getattr(i, "pressed_image_name", None) or ""
-        if pn:
+        pn = getattr(i, "pressed_image_name", None) or []
+        if isinstance(pn, list) and pn:
+            pressed_name = pn[0]
+            break
+        elif isinstance(pn, str) and pn:
             pressed_name = pn
             break
 
@@ -409,9 +415,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         padding-left: 16px;
     }}
     li {{
-        margin: 0;
+        margin: 0 0 2px 0;
         font-size: 7.5pt;
-        line-height: 1.3;
+        line-height: 1.5;
     }}
 
     .info-table th {{
