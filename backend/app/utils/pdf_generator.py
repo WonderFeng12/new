@@ -147,13 +147,14 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                   </tr>
                 </table>'''
 
-            pattern_grid_html = '<table style="width:100%;border-collapse:collapse;border:1px dashed #ccc">'
+            pattern_grid_html = '<table style="width:100%;border-collapse:collapse;border:1px dashed #ccc;border-right:none">'
             for row_start in range(0, len(groups), 3):
                 row_groups = groups[row_start:row_start + 3]
                 pattern_grid_html += '<tr>'
                 for gi, grp in enumerate(row_groups):
-                    border = 'border-right:1px dashed #ccc'
-                    pattern_grid_html += f'<td style="width:33%;{border};vertical-align:top;text-align:center;padding:4px">'
+                    is_last = (gi == len(row_groups) - 1)
+                    brd = '' if is_last else 'border-right:1px dashed #ccc;'
+                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;text-align:center;padding:4px">'
                     if is_composite and len(grp) == 2:
                         # A/B pair: use a 2-column table to guarantee side-by-side
                         a_html = _item_table(grp[0], 45)
@@ -168,8 +169,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                         for pd_item in grp:
                             pattern_grid_html += _item_table(pd_item, 100)
                     pattern_grid_html += '</td>'
-                for _ in range(3 - len(row_groups)):
-                    pattern_grid_html += '<td style="width:33%;border-right:1px dashed #ccc;vertical-align:top;padding:4px"></td>'
+                for fi in range(3 - len(row_groups)):
+                    brd = '' if fi == (3 - len(row_groups) - 1) else 'border-right:1px dashed #ccc;'
+                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;padding:4px"></td>'
                 pattern_grid_html += '</tr>'
             pattern_grid_html += '</table>'
 
