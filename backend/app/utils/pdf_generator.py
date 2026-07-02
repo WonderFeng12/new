@@ -110,9 +110,6 @@ def render_process_sheet(sheet, contract, items) -> bytes:
 
         # Build pattern grid (3 columns)
         pattern_grid_html = ""
-        pressed_path = getattr(i, "pressed_image", None) or []
-        if isinstance(pressed_path, str):
-            pressed_path = [pressed_path]
 
         if pattern_items:
             if is_composite:
@@ -148,16 +145,16 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                             if binding_no:
                                 info_lines.append(f'色号:{binding_no}')
                             info_html = "<br>".join(info_lines)
-                            pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:2px 4px;vertical-align:top">'
-                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86)
+                            pattern_grid_html += '<div style="display:inline-flex;align-items:flex-start;gap:2px;margin:1px 0;text-align:left">'
+                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86).replace('margin:1px', 'margin:0;display:block')
                             if info_html:
-                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;text-align:left">{info_html}</div>'
+                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;margin-left:2px;white-space:nowrap">{info_html}</div>'
                             pattern_grid_html += '</div>'
                             # Qty between A and B
                             if side_idx == 0 and qty is not None:
                                 pattern_grid_html += f'<div style="display:inline-block;margin:0 2px;font-size:6pt;font-weight:bold;color:#222;vertical-align:middle">数量:{qty}条</div>'
                     else:
-                        # Non-composite: show 4 lines per item
+                        # Non-composite: show 4 lines per item, image on left
                         for pd_item in grp:
                             img = pd_item.get("image", "")
                             code = pd_item.get("code", "") or ""
@@ -174,20 +171,16 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                             if qty is not None:
                                 info_lines.append(f'数量:{qty}条')
                             info_html = "<br>".join(info_lines)
-                            pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:2px 4px;vertical-align:top">'
-                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86)
+                            pattern_grid_html += '<div style="display:inline-flex;align-items:flex-start;gap:2px;margin:1px 0;text-align:left">'
+                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86).replace('margin:1px', 'margin:0;display:block')
                             if info_html:
-                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5">{info_html}</div>'
+                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;margin-left:2px;white-space:nowrap">{info_html}</div>'
                             pattern_grid_html += '</div>'
                     pattern_grid_html += '</td>'
                 # Fill remaining columns
                 for _ in range(3 - len(row_groups)):
                     pattern_grid_html += '<td style="width:33%;border:none"></td>'
                 pattern_grid_html += '</tr>'
-            # Last row: pressed images (multi-image support)
-            if pressed_path:
-                pressed_imgs = "".join(_img_tag(p, "压花", w=86, h=86) for p in pressed_path if p)
-                pattern_grid_html += f'<tr><td colspan="3" style="border:none;text-align:center;padding-top:4px;border-top:1px solid #eee"><span style="font-size:7pt;color:#888">压花:</span>{pressed_imgs}</td></tr>'
             pattern_grid_html += '</table>'
 
         # A/B side images
@@ -352,16 +345,28 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     binding_width = detail.get("binding_width", "") or ""
     emboss_model = detail.get("emboss_model", "") or ""
 
-    # Pressed image name from first item that has one
+    # Pressed images from first item that has them
+    pressed_paths = []
     pressed_name = ""
     for i in items:
+        pp = getattr(i, "pressed_image", None) or []
+        if isinstance(pp, str):
+            pp = [pp]
+        if pp:
+            pressed_paths = pp
         pn = getattr(i, "pressed_image_name", None) or []
         if isinstance(pn, list) and pn:
-            pressed_name = pn[0]
+            pressed_name = os.path.splitext(pn[0])[0]
             break
         elif isinstance(pn, str) and pn:
-            pressed_name = pn
+            pressed_name = os.path.splitext(pn)[0]
             break
+
+    pressed_images_html = ""
+    if pressed_paths:
+        imgs = "".join(_img_tag(p, "压花", w=86, h=86) for p in pressed_paths if p)
+        if imgs:
+            pressed_images_html = f'<div style="margin-top:2px;display:flex;align-items:center;gap:4px"><span style="font-size:7pt;color:#888">压花图:</span>{imgs}</div>'
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -537,6 +542,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         <span><strong>包边材料:</strong> {binding_material or '—'}</span>
         <span><strong>包边宽度:</strong> {binding_width or '—'}</span>
         <span><strong>压花型号:</strong> {pressed_name or emboss_model or '—'}</span>
+        {pressed_images_html}
     </div>
 
     <!-- Accessories Grid -->
