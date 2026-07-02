@@ -739,7 +739,10 @@ cp .env.example .env
 | 地址 | 101.43.1.54 |
 | SSH | 使用本机密钥 |
 | 部署路径 | /root/new/repo |
-| 更新 | git pull + docker compose up -d --build |
+| Git 远程 | GitHub (origin) + Gitee (gitee) |
+| Gitee | https://gitee.com/wonderfengnew/new.git |
+| 更新 | git pull origin main 或 git pull gitee main → docker compose up -d --build |
+| MySQL | 容器内 3306，映射宿主机 3308 |
 
 ### 部署架构
 

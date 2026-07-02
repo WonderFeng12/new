@@ -12,36 +12,36 @@
       </el-row>
     </el-card>
 
-    <el-table :data="sheets" v-loading="loading" stripe style="width:100%" @row-click="viewDetail">
-      <el-table-column prop="sheet_no" label="工艺单号" width="150" />
-      <el-table-column label="合同号" width="150">
+    <el-table :data="sortedSheets" v-loading="loading" stripe style="width:100%" @row-click="viewDetail" @sort-change="onSortChange">
+      <el-table-column prop="sheet_no" label="工艺单号" width="150" sortable="custom" />
+      <el-table-column label="合同号" width="150" sortable="custom" prop="_contract_no">
         <template #default="{ row }">{{ row.contract?.contract_no }}</template>
       </el-table-column>
-      <el-table-column label="毛毯规格" min-width="200">
+      <el-table-column label="毛毯规格" min-width="200" sortable="custom" prop="_spec">
         <template #default="{ row }">
           {{ specSummary(row) }}
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="80">
+      <el-table-column label="数量" width="80" sortable="custom" prop="_qty">
         <template #default="{ row }">
           {{ totalQty(row) }}
         </template>
       </el-table-column>
-      <el-table-column label="交期" width="100">
+      <el-table-column label="交期" width="100" sortable="custom" prop="_delivery">
         <template #default="{ row }">
           {{ firstDelivery(row) }}
         </template>
       </el-table-column>
-      <el-table-column label="合同版本" width="80">
+      <el-table-column label="版本" width="70" sortable="custom" prop="confirm_version_no">
         <template #default="{ row }">V{{ row.confirm_version_no }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="70">
+      <el-table-column label="状态" width="70" sortable="custom" prop="status">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_by" label="创建人" width="80" />
-      <el-table-column prop="created_at" label="创建时间" width="155" />
+      <el-table-column prop="created_by" label="创建人" width="80" sortable="custom" />
+      <el-table-column prop="created_at" label="创建时间" width="155" sortable="custom" />
       <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="viewDetail(row)">详情</el-button>
@@ -59,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listSheets, confirmSheet, dispatchSheet, deleteSheet } from '../../api/processSheet'
@@ -68,6 +68,38 @@ const router = useRouter()
 const sheets = ref([])
 const loading = ref(false)
 const keyword = ref('')
+const sortState = ref({ prop: '', order: '' })
+
+function onSortChange({ prop, order }) {
+  sortState.value = { prop: prop || '', order: order || '' }
+}
+
+const sortedSheets = computed(() => {
+  const data = sheets.value
+  const { prop, order } = sortState.value
+  if (!prop || !order) return data
+  return [...data].sort((a, b) => {
+    let va, vb
+    if (prop === '_contract_no') {
+      va = (a.contract?.contract_no || '').toLowerCase()
+      vb = (b.contract?.contract_no || '').toLowerCase()
+    } else if (prop === '_spec') {
+      va = specSummary(a).toLowerCase()
+      vb = specSummary(b).toLowerCase()
+    } else if (prop === '_qty') {
+      va = totalQty(a); vb = totalQty(b)
+    } else if (prop === '_delivery') {
+      va = firstDelivery(a) || ''; vb = firstDelivery(b) || ''
+    } else {
+      va = a[prop]; vb = b[prop]
+    }
+    if (va === vb) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))
+    return order === 'ascending' ? cmp : -cmp
+  })
+})
 
 function specSummary(row) {
   const items = row.items || []

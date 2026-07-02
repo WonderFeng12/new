@@ -13,28 +13,28 @@
       </el-row>
     </el-card>
 
-    <el-table :data="flatItems" v-loading="loading" stripe style="width:100%" @row-click="viewDetail">
-      <el-table-column prop="contract_no" label="合同号" width="140" />
-      <el-table-column prop="line_no" label="行号" width="50" />
-      <el-table-column label="客户" width="110">
+    <el-table :data="sortedItems" v-loading="loading" stripe style="width:100%" @row-click="viewDetail" @sort-change="onSortChange">
+      <el-table-column prop="contract_no" label="合同号" width="140" sortable="custom" />
+      <el-table-column prop="line_no" label="行号" width="50" sortable="custom" />
+      <el-table-column label="客户" width="110" sortable="custom" prop="_customer">
         <template #default="{ row }">{{ row._contract?.customer?.name }}</template>
       </el-table-column>
-      <el-table-column prop="contract_date" label="日期" width="100" />
-      <el-table-column label="规格" min-width="180">
+      <el-table-column prop="contract_date" label="日期" width="100" sortable="custom" />
+      <el-table-column label="规格" min-width="180" sortable="custom" prop="_spec">
         <template #default="{ row }">{{ row.spec_description || '—' }}</template>
       </el-table-column>
-      <el-table-column label="包装方式" width="90">
+      <el-table-column label="包装方式" width="90" sortable="custom" prop="packaging_type">
         <template #default="{ row }">{{ row.packaging_type || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="qty" label="数量" width="65" />
-      <el-table-column label="生产进度" width="130">
+      <el-table-column prop="qty" label="数量" width="65" sortable="custom" />
+      <el-table-column label="生产进度" width="130" sortable="custom" prop="production_status">
         <template #default="{ row }">
           <el-tag v-if="!row.production_status" size="small" type="info">待坯布计划</el-tag>
           <el-tag v-else-if="row.production_status==='cancelled'" size="small" type="danger">已取消</el-tag>
           <el-tag v-else size="small" :type="progressTagType(row)">{{ stepLabel(row.production_status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="合同状态" width="90">
+      <el-table-column label="合同状态" width="90" sortable="custom" prop="_contract_status">
         <template #default="{ row }">
           <el-tag :type="statusType(row._contract?.computed_status || row._contract?.status)" size="small">{{ row._contract?.computed_status || row._contract?.status }}</el-tag>
         </template>
@@ -79,6 +79,42 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const processSteps = ref([])
+
+const sortState = ref({ prop: '', order: '' })
+
+function onSortChange({ prop, order }) {
+  sortState.value = { prop: prop || '', order: order || '' }
+}
+
+const sortedItems = computed(() => {
+  const data = flatItems.value
+  const { prop, order } = sortState.value
+  if (!prop || !order) return data
+  return [...data].sort((a, b) => {
+    let va, vb
+    if (prop === '_customer') {
+      va = (a._contract?.customer?.name || '').toLowerCase()
+      vb = (b._contract?.customer?.name || '').toLowerCase()
+    } else if (prop === '_spec') {
+      va = (a.spec_description || '').toLowerCase()
+      vb = (b.spec_description || '').toLowerCase()
+    } else if (prop === '_contract_status') {
+      va = (a._contract?.computed_status || a._contract?.status || '').toLowerCase()
+      vb = (b._contract?.computed_status || b._contract?.status || '').toLowerCase()
+    } else if (prop === 'contract_date') {
+      va = a.contract_date || ''
+      vb = b.contract_date || ''
+    } else {
+      va = a[prop]
+      vb = b[prop]
+    }
+    if (va === vb) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))
+    return order === 'ascending' ? cmp : -cmp
+  })
+})
 
 const stepNameMap = computed(() => {
   const map = {}
