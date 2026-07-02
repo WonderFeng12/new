@@ -147,7 +147,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                   </tr>
                 </table>'''
 
-            pattern_grid_html = '<table style="width:100%;border-collapse:collapse;border:1px dashed #ccc;border-right:none">'
+            pattern_grid_html = '<table style="width:100%;border-collapse:collapse;border:none">'
             for row_start in range(0, len(groups), 3):
                 row_groups = groups[row_start:row_start + 3]
                 pattern_grid_html += '<tr>'
