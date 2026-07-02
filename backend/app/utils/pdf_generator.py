@@ -125,6 +125,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
             qty_per = float(i.qty or 0) / pattern_count if pattern_count else 0
             qty_str = f'{qty_per:.1f}' if qty_per else ''
 
+            # Dynamic image size: larger for single-item, smaller for A/B pair
+            img_size = 70 if is_composite else 120
+
             pattern_grid_html = '<table style="width:100%;border-collapse:collapse">'
             for row_start in range(0, len(groups), 3):
                 row_groups = groups[row_start:row_start + 3]
@@ -150,11 +153,14 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                         if qty_str:
                             info_lines.append(f'数量:{qty_str}条')
                         info_html = "<br>".join(info_lines)
-                        pattern_grid_html += '<div style="display:inline-flex;align-items:flex-start;gap:2px;margin:1px 2px;text-align:left">'
-                        pattern_grid_html += _img_tag(img, "花型", w=86, h=86).replace('margin:1px', 'margin:0;display:block')
-                        if info_html:
-                            pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;margin-left:2px;white-space:nowrap">{info_html}</div>'
+                        pattern_grid_html += '<div style="display:inline-table;vertical-align:top;margin:1px;text-align:left">'
+                        pattern_grid_html += '<div style="display:table-row">'
+                        pattern_grid_html += f'<div style="display:table-cell;vertical-align:top">'
+                        pattern_grid_html += _img_tag(img, "花型", w=img_size, h=img_size).replace('margin:1px', 'margin:0;display:block')
                         pattern_grid_html += '</div>'
+                        if info_html:
+                            pattern_grid_html += f'<div style="display:table-cell;vertical-align:top;padding-left:2px;font-size:6pt;color:#555;line-height:1.5;white-space:nowrap">{info_html}</div>'
+                        pattern_grid_html += '</div></div>'
                     pattern_grid_html += '</td>'
                 # Fill remaining columns
                 for _ in range(3 - len(row_groups)):
