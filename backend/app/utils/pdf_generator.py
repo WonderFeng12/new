@@ -130,19 +130,19 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 line1_parts = []
                 if code:
                     line1_parts.append(f'花型:{code}')
-                if binding_no:
-                    line1_parts.append(f'色号:{binding_no}')
+                if qty_str:
+                    line1_parts.append(f'数量:{qty_str}条')
                 line2_parts = []
                 if color:
                     line2_parts.append(f'颜色:{color}')
-                if qty_str:
-                    line2_parts.append(f'数量:{qty_str}条')
+                if binding_no:
+                    line2_parts.append(f'色号:{binding_no}')
                 info = '<br>'.join([' '.join(line1_parts), ' '.join(line2_parts)])
                 img_src = _resolve_image_path(pd_item.get("image", ""))
                 if not img_src:
                     return ""
-                img = f'<img src="{img_src}" style="height:36pt;width:auto;margin:0 auto;display:block;border:1px solid #ccc;border-radius:2px">'
-                return f'''<div style="text-align:center;margin:3px 0">
+                img = f'<img src="{img_src}" style="height:42pt;width:auto;margin:0 auto;display:block;border:1px solid #ccc;border-radius:2px">'
+                return f'''<div style="text-align:center;margin:2px 0">
                   <div>{img}</div>
                   <div style="font-size:5.5pt;color:#555;line-height:1.3">{info}</div>
                 </div>'''
@@ -154,7 +154,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 for gi, grp in enumerate(row_groups):
                     is_last = (gi == len(row_groups) - 1)
                     brd = 'border:none;border-right:1px dashed #ccc;' if not is_last else 'border:none;'
-                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;text-align:center;padding:4px">'
+                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;text-align:center;padding:4px 0">'
                     if is_composite and len(grp) == 2:
                         # A/B pair: use a 2-column table to guarantee side-by-side
                         a_html = _item_table(grp[0])
@@ -171,7 +171,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                     pattern_grid_html += '</td>'
                 for fi in range(3 - len(row_groups)):
                     brd = 'border:none;border-right:1px dashed #ccc;' if fi < (3 - len(row_groups) - 1) else 'border:none;'
-                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;padding:4px"></td>'
+                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;padding:4px 0"></td>'
                 pattern_grid_html += '</tr>'
             pattern_grid_html += '</table>'
 
