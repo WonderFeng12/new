@@ -132,24 +132,53 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                     if gi > 0:
                         pattern_grid_html += ';border-left:1px dashed #ccc;padding-left:6px'
                     pattern_grid_html += '">'
-                    for pd_item in grp:
-                        img = pd_item.get("image", "")
-                        code = pd_item.get("code", "") or ""
-                        color = pd_item.get("color", "") or ""
-                        binding_no = pd_item.get("binding_color_no", "") or ""
-                        info_parts = []
-                        if code:
-                            info_parts.append(code)
-                        if color:
-                            info_parts.append(f"颜色:{color}")
-                        if binding_no:
-                            info_parts.append(f"色号:{binding_no}")
-                        info_str = " | ".join(info_parts)
-                        pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:2px 4px;vertical-align:top">'
-                        pattern_grid_html += _img_tag(img, "花型", w=86, h=86)
-                        if info_str:
-                            pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.1;word-wrap:break-word;max-width:55px">{info_str}</div>'
-                        pattern_grid_html += '</div>'
+                    if is_composite and len(grp) == 2:
+                        # Composite A/B pair: show A (3 lines), qty between, B (3 lines)
+                        for side_idx, pd_item in enumerate(grp):
+                            img = pd_item.get("image", "")
+                            code = pd_item.get("code", "") or ""
+                            color = pd_item.get("color", "") or ""
+                            binding_no = pd_item.get("binding_color_no", "") or ""
+                            qty = pd_item.get("qty")
+                            info_lines = []
+                            if code:
+                                info_lines.append(f'花型:{code}')
+                            if color:
+                                info_lines.append(f'颜色:{color}')
+                            if binding_no:
+                                info_lines.append(f'色号:{binding_no}')
+                            info_html = "<br>".join(info_lines)
+                            pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:2px 4px;vertical-align:top">'
+                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86)
+                            if info_html:
+                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;text-align:left">{info_html}</div>'
+                            pattern_grid_html += '</div>'
+                            # Qty between A and B
+                            if side_idx == 0 and qty is not None:
+                                pattern_grid_html += f'<div style="display:inline-block;margin:0 2px;font-size:6pt;font-weight:bold;color:#222;vertical-align:middle">数量:{qty}条</div>'
+                    else:
+                        # Non-composite: show 4 lines per item
+                        for pd_item in grp:
+                            img = pd_item.get("image", "")
+                            code = pd_item.get("code", "") or ""
+                            color = pd_item.get("color", "") or ""
+                            binding_no = pd_item.get("binding_color_no", "") or ""
+                            qty = pd_item.get("qty")
+                            info_lines = []
+                            if code:
+                                info_lines.append(f'花型:{code}')
+                            if color:
+                                info_lines.append(f'颜色:{color}')
+                            if binding_no:
+                                info_lines.append(f'色号:{binding_no}')
+                            if qty is not None:
+                                info_lines.append(f'数量:{qty}条')
+                            info_html = "<br>".join(info_lines)
+                            pattern_grid_html += '<div style="display:inline-block;text-align:center;margin:2px 4px;vertical-align:top">'
+                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86)
+                            if info_html:
+                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5">{info_html}</div>'
+                            pattern_grid_html += '</div>'
                     pattern_grid_html += '</td>'
                 # Fill remaining columns
                 for _ in range(3 - len(row_groups)):
