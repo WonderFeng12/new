@@ -120,6 +120,11 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 # Each item is its own group
                 groups = [[p] for p in pattern_items]
 
+            # Calculate qty per pattern: total qty / pattern count
+            pattern_count = int(i.pattern_count or len(pattern_data) or 1)
+            qty_per = float(i.qty or 0) / pattern_count if pattern_count else 0
+            qty_str = f'{qty_per:.1f}' if qty_per else ''
+
             pattern_grid_html = '<table style="width:100%;border-collapse:collapse">'
             for row_start in range(0, len(groups), 3):
                 row_groups = groups[row_start:row_start + 3]
@@ -129,53 +134,27 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                     if gi > 0:
                         pattern_grid_html += ';border-left:1px dashed #ccc;padding-left:6px'
                     pattern_grid_html += '">'
-                    if is_composite and len(grp) == 2:
-                        # Composite A/B pair: show A (3 lines), qty between, B (3 lines)
-                        for side_idx, pd_item in enumerate(grp):
-                            img = pd_item.get("image", "")
-                            code = pd_item.get("code", "") or ""
-                            color = pd_item.get("color", "") or ""
-                            binding_no = pd_item.get("binding_color_no", "") or ""
-                            qty = pd_item.get("qty")
-                            info_lines = []
-                            if code:
-                                info_lines.append(f'花型:{code}')
-                            if color:
-                                info_lines.append(f'颜色:{color}')
-                            if binding_no:
-                                info_lines.append(f'色号:{binding_no}')
-                            info_html = "<br>".join(info_lines)
-                            pattern_grid_html += '<div style="display:inline-flex;align-items:flex-start;gap:2px;margin:1px 0;text-align:left">'
-                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86).replace('margin:1px', 'margin:0;display:block')
-                            if info_html:
-                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;margin-left:2px;white-space:nowrap">{info_html}</div>'
-                            pattern_grid_html += '</div>'
-                            # Qty between A and B
-                            if side_idx == 0 and qty is not None:
-                                pattern_grid_html += f'<div style="display:inline-block;margin:0 2px;font-size:6pt;font-weight:bold;color:#222;vertical-align:middle">数量:{qty}条</div>'
-                    else:
-                        # Non-composite: show 4 lines per item, image on left
-                        for pd_item in grp:
-                            img = pd_item.get("image", "")
-                            code = pd_item.get("code", "") or ""
-                            color = pd_item.get("color", "") or ""
-                            binding_no = pd_item.get("binding_color_no", "") or ""
-                            qty = pd_item.get("qty")
-                            info_lines = []
-                            if code:
-                                info_lines.append(f'花型:{code}')
-                            if color:
-                                info_lines.append(f'颜色:{color}')
-                            if binding_no:
-                                info_lines.append(f'色号:{binding_no}')
-                            if qty is not None:
-                                info_lines.append(f'数量:{qty}条')
-                            info_html = "<br>".join(info_lines)
-                            pattern_grid_html += '<div style="display:inline-flex;align-items:flex-start;gap:2px;margin:1px 0;text-align:left">'
-                            pattern_grid_html += _img_tag(img, "花型", w=86, h=86).replace('margin:1px', 'margin:0;display:block')
-                            if info_html:
-                                pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;margin-left:2px;white-space:nowrap">{info_html}</div>'
-                            pattern_grid_html += '</div>'
+                    # Render each item in group: image left, 4 lines right
+                    for pd_item in grp:
+                        img = pd_item.get("image", "")
+                        code = pd_item.get("code", "") or ""
+                        color = pd_item.get("color", "") or ""
+                        binding_no = pd_item.get("binding_color_no", "") or ""
+                        info_lines = []
+                        if code:
+                            info_lines.append(f'花型:{code}')
+                        if color:
+                            info_lines.append(f'颜色:{color}')
+                        if binding_no:
+                            info_lines.append(f'色号:{binding_no}')
+                        if qty_str:
+                            info_lines.append(f'数量:{qty_str}条')
+                        info_html = "<br>".join(info_lines)
+                        pattern_grid_html += '<div style="display:inline-flex;align-items:flex-start;gap:2px;margin:1px 2px;text-align:left">'
+                        pattern_grid_html += _img_tag(img, "花型", w=86, h=86).replace('margin:1px', 'margin:0;display:block')
+                        if info_html:
+                            pattern_grid_html += f'<div style="font-size:6pt;color:#555;line-height:1.5;margin-left:2px;white-space:nowrap">{info_html}</div>'
+                        pattern_grid_html += '</div>'
                     pattern_grid_html += '</td>'
                 # Fill remaining columns
                 for _ in range(3 - len(row_groups)):
@@ -211,6 +190,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
         <tr>
             <td style="text-align:center">{i.line_no}</td>
             <td>{spec_name}</td>
+            <td style="text-align:center">{int(i.pattern_count or len(pattern_data) or 0)}</td>
             <td style="text-align:center">{packaging}</td>
             <td style="text-align:center">{pressed}</td>
             <td style="text-align:right">{float(i.qty or 0):.1f}</td>
@@ -484,6 +464,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     .compact-info {{
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
         gap: 4px 16px;
         padding: 3px 6px;
         border: 1px solid #333;
@@ -528,7 +509,8 @@ def render_process_sheet(sheet, contract, items) -> bytes:
     <table class="item-table">
         <tr>
             <th style="width:4%">行号</th>
-            <th style="width:28%">毛毯规格</th>
+            <th style="width:22%">毛毯规格</th>
+            <th style="width:6%">花型个数</th>
             <th style="width:9%">包装方式</th>
             <th style="width:6%">压花</th>
             <th style="width:8%">数量</th>
