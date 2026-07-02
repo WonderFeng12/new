@@ -116,7 +116,8 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 pairs = [pattern_items[j:j+2] for j in range(0, len(pattern_items), 2)]
                 groups = pairs
             else:
-                groups = [[p] for p in pattern_items]
+                # Group items in pairs so 2 items stack vertically per grid cell
+                groups = [pattern_items[j:j+2] for j in range(0, len(pattern_items), 2)]
 
             pattern_count = int(i.pattern_count or len(pattern_data) or 1)
             qty_per = float(i.qty or 0) / pattern_count if pattern_count else 0
@@ -126,26 +127,25 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 code = pd_item.get("code", "") or ""
                 color = pd_item.get("color", "") or ""
                 binding_no = pd_item.get("binding_color_no", "") or ""
-                lines = []
+                line1_parts = []
                 if code:
-                    lines.append(f'花型:{code}')
-                if color:
-                    lines.append(f'颜色:{color}')
+                    line1_parts.append(f'花型:{code}')
                 if binding_no:
-                    lines.append(f'色号:{binding_no}')
+                    line1_parts.append(f'色号:{binding_no}')
+                line2_parts = []
+                if color:
+                    line2_parts.append(f'颜色:{color}')
                 if qty_str:
-                    lines.append(f'数量:{qty_str}条')
-                info = "<br>".join(lines)
+                    line2_parts.append(f'数量:{qty_str}条')
+                info = '<br>'.join([' '.join(line1_parts), ' '.join(line2_parts)])
                 img_src = _resolve_image_path(pd_item.get("image", ""))
                 if not img_src:
                     return ""
-                img = f'<img src="{img_src}" style="height:36pt;width:auto;margin:0;display:block;border:1px solid #ccc;border-radius:2px">'
-                return f'''<table style="display:inline-table;border:none;border-collapse:collapse;vertical-align:top;margin:2px">
-                  <tr>
-                    <td style="border:none;padding:0;vertical-align:top">{img}</td>
-                    <td style="border:none;padding:0 0 0 4px;vertical-align:middle;font-size:6pt;color:#555;line-height:1.5;white-space:nowrap">{info}</td>
-                  </tr>
-                </table>'''
+                img = f'<img src="{img_src}" style="height:36pt;width:auto;margin:0 auto;display:block;border:1px solid #ccc;border-radius:2px">'
+                return f'''<div style="text-align:center;margin:3px 0">
+                  <div>{img}</div>
+                  <div style="font-size:5.5pt;color:#555;line-height:1.3">{info}</div>
+                </div>'''
 
             pattern_grid_html = '<table style="width:100%;border-collapse:separate;border-spacing:0;border:none">'
             for row_start in range(0, len(groups), 3):
