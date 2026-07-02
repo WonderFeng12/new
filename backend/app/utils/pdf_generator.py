@@ -141,20 +141,21 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 img_src = _resolve_image_path(pd_item.get("image", ""))
                 if not img_src:
                     return ""
-                img = f'<img src="{img_src}" style="height:48pt;width:auto;margin:0 auto;display:block;border:1px solid #ccc;border-radius:2px">'
+                img = f'<img src="{img_src}" style="height:42pt;width:auto;margin:0 auto;display:block;border:1px solid #ccc;border-radius:2px">'
                 return f'''<div style="text-align:center;margin:1px 0">
                   <div>{img}</div>
                   <div style="font-size:5.5pt;color:#555;line-height:1.3">{info}</div>
                 </div>'''
 
             pattern_grid_html = '<table style="width:100%;border-collapse:separate;border-spacing:0;border:none">'
-            for row_start in range(0, len(groups), 3):
-                row_groups = groups[row_start:row_start + 3]
+            col_count = 5
+            for row_start in range(0, len(groups), col_count):
+                row_groups = groups[row_start:row_start + col_count]
                 pattern_grid_html += '<tr>'
                 for gi, grp in enumerate(row_groups):
                     is_last = (gi == len(row_groups) - 1)
                     brd = 'border:none;border-right:1px dashed #ccc;' if not is_last else 'border:none;'
-                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;text-align:center;padding:2px 0">'
+                    pattern_grid_html += f'<td style="width:{100/col_count:.1f}%;{brd}vertical-align:top;text-align:center;padding:2px 0">'
                     if is_composite and len(grp) == 2:
                         # A/B pair: use a 2-column table to guarantee side-by-side
                         a_html = _item_table(grp[0])
@@ -169,9 +170,9 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                         for pd_item in grp:
                             pattern_grid_html += _item_table(pd_item)
                     pattern_grid_html += '</td>'
-                for fi in range(3 - len(row_groups)):
-                    brd = 'border:none;border-right:1px dashed #ccc;' if fi < (3 - len(row_groups) - 1) else 'border:none;'
-                    pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;padding:2px 0"></td>'
+                for fi in range(col_count - len(row_groups)):
+                    brd = 'border:none;border-right:1px dashed #ccc;' if fi < (col_count - len(row_groups) - 1) else 'border:none;'
+                    pattern_grid_html += f'<td style="width:{100/col_count:.1f}%;{brd}vertical-align:top;padding:2px 0"></td>'
                 pattern_grid_html += '</tr>'
             pattern_grid_html += '</table>'
 
