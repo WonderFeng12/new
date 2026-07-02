@@ -113,58 +113,56 @@ def render_process_sheet(sheet, contract, items) -> bytes:
 
         if pattern_items:
             if is_composite:
-                # Group as A/B pairs: (1A,1B), (2A,2B), (3A,3B)...
                 pairs = [pattern_items[j:j+2] for j in range(0, len(pattern_items), 2)]
                 groups = pairs
             else:
-                # Each item is its own group
                 groups = [[p] for p in pattern_items]
 
-            # Calculate qty per pattern: total qty / pattern count
             pattern_count = int(i.pattern_count or len(pattern_data) or 1)
             qty_per = float(i.qty or 0) / pattern_count if pattern_count else 0
             qty_str = f'{qty_per:.1f}' if qty_per else ''
 
-            # Dynamic image size: larger for single-item, smaller for A/B pair
-            img_size = 70 if is_composite else 120
+            img_size = 55 if is_composite else 100
 
-            pattern_grid_html = '<table style="width:100%;border-collapse:collapse">'
+            def _info_html(pd_item):
+                code = pd_item.get("code", "") or ""
+                color = pd_item.get("color", "") or ""
+                binding_no = pd_item.get("binding_color_no", "") or ""
+                lines = []
+                if code:
+                    lines.append(f'花型:{code}')
+                if color:
+                    lines.append(f'颜色:{color}')
+                if binding_no:
+                    lines.append(f'色号:{binding_no}')
+                if qty_str:
+                    lines.append(f'数量:{qty_str}条')
+                return "<br>".join(lines)
+
+            pattern_grid_html = '<table style="width:100%;border-collapse:collapse;border:1px dashed #ccc">'
             for row_start in range(0, len(groups), 3):
                 row_groups = groups[row_start:row_start + 3]
                 pattern_grid_html += '<tr>'
                 for gi, grp in enumerate(row_groups):
-                    pattern_grid_html += '<td style="width:33%;border:none;vertical-align:top;text-align:center;padding:3px'
-                    if gi > 0:
-                        pattern_grid_html += ';border-left:1px dashed #ccc;padding-left:6px'
-                    pattern_grid_html += '">'
-                    # Render each item in group: image left, 4 lines right
+                    pattern_grid_html += '<td style="width:33%;border-right:1px dashed #ccc;vertical-align:top;text-align:center;padding:3px">'
                     for pd_item in grp:
-                        img = pd_item.get("image", "")
-                        code = pd_item.get("code", "") or ""
-                        color = pd_item.get("color", "") or ""
-                        binding_no = pd_item.get("binding_color_no", "") or ""
-                        info_lines = []
-                        if code:
-                            info_lines.append(f'花型:{code}')
-                        if color:
-                            info_lines.append(f'颜色:{color}')
-                        if binding_no:
-                            info_lines.append(f'色号:{binding_no}')
-                        if qty_str:
-                            info_lines.append(f'数量:{qty_str}条')
-                        info_html = "<br>".join(info_lines)
-                        pattern_grid_html += '<div style="display:inline-table;vertical-align:top;margin:1px;text-align:left">'
-                        pattern_grid_html += '<div style="display:table-row">'
-                        pattern_grid_html += f'<div style="display:table-cell;vertical-align:top">'
-                        pattern_grid_html += _img_tag(img, "花型", w=img_size, h=img_size).replace('margin:1px', 'margin:0;display:block')
-                        pattern_grid_html += '</div>'
-                        if info_html:
-                            pattern_grid_html += f'<div style="display:table-cell;vertical-align:top;padding-left:2px;font-size:6pt;color:#555;line-height:1.5;white-space:nowrap">{info_html}</div>'
-                        pattern_grid_html += '</div></div>'
+                        info = _info_html(pd_item)
+                        img_tag = _img_tag(pd_item.get("image", ""), "花型", w=img_size, h=img_size).replace('margin:1px', 'margin:0;display:block')
+                        if is_composite:
+                            # A/B pair: image on top, text below, side by side as inline-block
+                            pattern_grid_html += f'<div style="display:inline-block;vertical-align:top;text-align:center;margin:2px 3px">'
+                            pattern_grid_html += img_tag
+                            pattern_grid_html += f'<div style="font-size:5.5pt;color:#555;line-height:1.5">{info}</div>'
+                            pattern_grid_html += '</div>'
+                        else:
+                            # Single item: image left, text right
+                            pattern_grid_html += f'<div style="display:inline-block;vertical-align:top;white-space:nowrap;margin:1px;text-align:left">'
+                            pattern_grid_html += img_tag.replace('display:block', 'display:inline-block;vertical-align:top')
+                            pattern_grid_html += f'<span style="display:inline-block;vertical-align:top;font-size:6pt;color:#555;line-height:1.5;padding-left:2px">{info}</span>'
+                            pattern_grid_html += '</div>'
                     pattern_grid_html += '</td>'
-                # Fill remaining columns
                 for _ in range(3 - len(row_groups)):
-                    pattern_grid_html += '<td style="width:33%;border:none"></td>'
+                    pattern_grid_html += '<td style="width:33%;border-right:1px dashed #ccc;vertical-align:top;padding:3px"></td>'
                 pattern_grid_html += '</tr>'
             pattern_grid_html += '</table>'
 
