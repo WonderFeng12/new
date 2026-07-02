@@ -122,7 +122,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
             qty_per = float(i.qty or 0) / pattern_count if pattern_count else 0
             qty_str = f'{qty_per:.1f}' if qty_per else ''
 
-            def _item_table(pd_item, sz):
+            def _item_table(pd_item):
                 code = pd_item.get("code", "") or ""
                 color = pd_item.get("color", "") or ""
                 binding_no = pd_item.get("binding_color_no", "") or ""
@@ -139,11 +139,11 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                 img_src = _resolve_image_path(pd_item.get("image", ""))
                 if not img_src:
                     return ""
-                img = f'<img src="{img_src}" style="max-width:{sz}px;max-height:{sz}px;margin:0;display:block;border:1px solid #ccc;border-radius:2px">'
+                img = f'<img src="{img_src}" style="height:36pt;width:auto;margin:0;display:block;border:1px solid #ccc;border-radius:2px">'
                 return f'''<table style="display:inline-table;border:none;border-collapse:collapse;vertical-align:top;margin:2px">
                   <tr>
-                    <td style="border:none;padding:0;vertical-align:top;width:{sz}px">{img}</td>
-                    <td style="border:none;padding:0 0 0 2px;vertical-align:top;font-size:6pt;color:#555;line-height:1.5;white-space:nowrap">{info}</td>
+                    <td style="border:none;padding:0;vertical-align:top">{img}</td>
+                    <td style="border:none;padding:0 0 0 4px;vertical-align:middle;font-size:6pt;color:#555;line-height:1.5;white-space:nowrap">{info}</td>
                   </tr>
                 </table>'''
 
@@ -157,8 +157,8 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                     pattern_grid_html += f'<td style="width:33%;{brd}vertical-align:top;text-align:center;padding:4px">'
                     if is_composite and len(grp) == 2:
                         # A/B pair: use a 2-column table to guarantee side-by-side
-                        a_html = _item_table(grp[0], 45)
-                        b_html = _item_table(grp[1], 45)
+                        a_html = _item_table(grp[0])
+                        b_html = _item_table(grp[1])
                         pattern_grid_html += f'''<table style="width:100%;border:none;border-collapse:collapse">
                           <tr>
                             <td style="width:50%;border:none;vertical-align:top;text-align:center;padding:2px">{a_html}</td>
@@ -167,7 +167,7 @@ def render_process_sheet(sheet, contract, items) -> bytes:
                         </table>'''
                     else:
                         for pd_item in grp:
-                            pattern_grid_html += _item_table(pd_item, 100)
+                            pattern_grid_html += _item_table(pd_item)
                     pattern_grid_html += '</td>'
                 for fi in range(3 - len(row_groups)):
                     brd = 'border:none;border-right:1px dashed #ccc;' if fi < (3 - len(row_groups) - 1) else 'border:none;'
