@@ -23,8 +23,8 @@ def create(data: SpecCreate, db: Session = Depends(get_db), current_user: User =
     return service.create_spec(db, data, current_user.display_name or current_user.username)
 
 @router.put("/{id}", response_model=SpecOut)
-def update(id: int, data: SpecUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("spec:manage"))):
-    result = service.update_spec(db, id, data, current_user.display_name or current_user.username)
+def update(id: int, data: SpecUpdate, cascade: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("spec:manage"))):
+    result = service.update_spec(db, id, data, current_user.display_name or current_user.username, cascade=cascade)
     if not result: raise HTTPException(404, "规格不存在")
     return result
 

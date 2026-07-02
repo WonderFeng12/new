@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Any
 from datetime import datetime, date
 from app.schemas.contract import ContractOut
+from app.schemas.spec import SpecOut
 
 
 class ProcessSheetItemCreate(BaseModel):
@@ -16,6 +17,7 @@ class ProcessSheetItemOut(BaseModel):
     contract_item_id: int
     line_no: int
     spec_id: int
+    spec: Optional[SpecOut] = None
     is_pressed: bool = False
     packaging_type: Optional[str] = None
     delivery_date: Optional[date] = None

@@ -22,7 +22,7 @@
       <el-table-column prop="layer_type" label="层类型" width="100" sortable="custom" />
       <el-table-column label="操作" width="200">
         <template #default="{ row }">
-          <el-button size="small" :disabled="row.is_in_use" @click="editRow(row)">编辑</el-button>
+          <el-button size="small" @click="editRow(row)">编辑</el-button>
           <el-button size="small" @click="handleClone(row)">复制</el-button>
           <el-popconfirm title="确认删除?" @confirm="handleDelete(row)">
             <template #reference><el-button size="small" type="danger" :disabled="row.is_in_use">删除</el-button></template>
@@ -67,7 +67,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { listSpecs, createSpec, updateSpec, deleteSpec, cloneSpec } from '../../api/spec'
 import { listBasicData } from '../../api/basicData'
 
@@ -76,6 +76,7 @@ const loading = ref(false)
 const keyword = ref('')
 const showDialog = ref(false)
 const editingId = ref(null)
+const editingInUse = ref(false)
 const saving = ref(false)
 const tableRef = ref(null)
 const form = ref({ length: '', width: '', weight: '', layer_type: '单层' })
@@ -96,9 +97,10 @@ async function fetchData() {
   catch {} finally { loading.value = false }
 }
 function search() { fetchData() }
-function openCreate() { editingId.value = null; form.value = { length: '', width: '', weight: '', layer_type: '单层' }; showDialog.value = true }
+function openCreate() { editingId.value = null; editingInUse.value = false; form.value = { length: '', width: '', weight: '', layer_type: '单层' }; showDialog.value = true }
 function editRow(row) {
   editingId.value = row.id
+  editingInUse.value = row.is_in_use
   form.value = { ...row, weight: row.weight.replace(/KG/i, '') }
   showDialog.value = true
 }
@@ -116,10 +118,21 @@ function onSortChange({ prop, order }) {
 }
 
 async function handleSave() {
+  if (editingId.value && editingInUse.value) {
+    try {
+      await ElMessageBox.confirm(
+        '该规格已被合同引用，修改会影响所有引用此规格的合同和工艺单，是否继续？',
+        '确认修改',
+        { confirmButtonText: '继续修改', cancelButtonText: '取消', type: 'warning' }
+      )
+    } catch { return }
+  }
   saving.value = true
   try {
-    if (editingId.value) { await updateSpec(editingId.value, form.value); ElMessage.success('已更新') }
-    else { await createSpec(form.value); ElMessage.success('已创建') }
+    if (editingId.value) {
+      await updateSpec(editingId.value, form.value, editingInUse.value)
+      ElMessage.success('已更新')
+    } else { await createSpec(form.value); ElMessage.success('已创建') }
     showDialog.value = false; editingId.value = null; fetchData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '保存失败') }
   finally { saving.value = false }

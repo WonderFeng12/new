@@ -258,6 +258,7 @@
                 <el-col :span="8">
                   <el-form-item label="花型个数">
                     <el-input-number v-model="activeItem.pattern_count" :min="0" :max="20" size="small" style="width:120px" @change="onPatternCountChange" :disabled="!isEditing" />
+                    <el-button v-if="isEditing" size="small" style="margin-left:8px" @click="openCopyPatternDialog">复制花型</el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
@@ -543,6 +544,30 @@
         <el-button type="danger" @click="confirmCancelItem">确认取消</el-button>
       </template>
     </el-dialog>
+
+    <!-- 复制花型对话框 -->
+    <el-dialog v-model="showCopyDialog" title="选择要复制花型的工艺单" width="760px">
+      <el-table :data="copySheetList" v-loading="copyLoading" stripe highlight-current-row @current-change="onCopySheetSelect">
+        <el-table-column prop="sheet_no" label="工艺单号" width="150" />
+        <el-table-column label="毛毯规格" min-width="200">
+          <template #default="{ row }">
+            {{ (row.items || []).map(i => i.spec?.spec_description || i.spec?.spec_name || '').filter(Boolean).join('; ') }}
+          </template>
+        </el-table-column>
+        <el-table-column label="版本" width="70">
+          <template #default="{ row }">V{{ row.confirm_version_no }}</template>
+        </el-table-column>
+        <el-table-column label="花型数" width="70">
+          <template #default="{ row }">
+            {{ (row.items || []).reduce((s, i) => s + (i.pattern_count || 0), 0) }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="showCopyDialog = false">取消</el-button>
+        <el-button type="primary" :disabled="!selectedCopySheet" @click="confirmCopyPattern">确认复制</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -550,7 +575,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet, forceConfirmSheet, cancelSheetItem, restoreSheetItem } from '../../api/processSheet'
+import { getSheet, confirmSheet, dispatchSheet, updateSheetDetail, markVersion, getSheetLogs, generateConfirmLink, internalConfirmSheet, reopenSheetEdit, setConfirmUsers, printSheet, forceConfirmSheet, cancelSheetItem, restoreSheetItem, listSheets } from '../../api/processSheet'
 import { usePermissionStore } from '../../store/permissions'
 import { listSpecs } from '../../api/spec'
 import { listUsers } from '../../api/user'
@@ -670,6 +695,62 @@ async function handleRestoreItem(row) {
     ElMessage.success('已恢复')
     loadData()
   } catch (e) { ElMessage.error(e.response?.data?.detail || '恢复失败') }
+}
+
+// Copy pattern dialog state
+const showCopyDialog = ref(false)
+const copySheetList = ref([])
+const copyLoading = ref(false)
+const selectedCopySheet = ref(null)
+
+function openCopyPatternDialog() {
+  selectedCopySheet.value = null
+  showCopyDialog.value = true
+  loadCopySheetList()
+}
+
+async function loadCopySheetList() {
+  copyLoading.value = true
+  try {
+    const res = await listSheets({})
+    // Exclude current sheet
+    copySheetList.value = (res.data || []).filter(s => s.id !== Number(route.params.id))
+  } catch {} finally { copyLoading.value = false }
+}
+
+function onCopySheetSelect(row) {
+  selectedCopySheet.value = row
+}
+
+function confirmCopyPattern() {
+  if (!selectedCopySheet.value) return
+  const srcItem = selectedCopySheet.value.items?.[0]
+  if (!srcItem) { ElMessage.warning('所选工艺单无行项目'); return }
+  const item = activeItem.value
+  if (!item) return
+
+  // Copy pattern fields from matching spec item in source sheet
+  const matchIdx = (selectedCopySheet.value.items || []).findIndex(si => si.spec_id === item.spec_id)
+  const src = matchIdx >= 0 ? selectedCopySheet.value.items[matchIdx] : srcItem
+
+  if (src.pattern_data?.length) {
+    item.pattern_data = JSON.parse(JSON.stringify(src.pattern_data))
+    item.pattern_count = src.pattern_count || src.pattern_data.length
+    // Also copy color/pattern_code if available
+    if (src.pattern_code) item.pattern_code = src.pattern_code
+    if (src.color_a) item.color_a = src.color_a
+    if (src.color_b) item.color_b = src.color_b
+    if (src.image_a_1) item.image_a_1 = src.image_a_1
+    if (src.image_a_2) item.image_a_2 = src.image_a_2
+    if (src.image_a_3) item.image_a_3 = src.image_a_3
+    if (src.image_b_1) item.image_b_1 = src.image_b_1
+    if (src.image_b_2) item.image_b_2 = src.image_b_2
+    if (src.image_b_3) item.image_b_3 = src.image_b_3
+    ElMessage.success('花型已复制')
+  } else {
+    ElMessage.warning('所选工艺单无花型数据')
+  }
+  showCopyDialog.value = false
 }
 
 // Detail dialog state

@@ -404,6 +404,8 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 | B043 | 工艺单行项目取消/恢复：取消时保存快照写 ProductionLog，恢复时清 cancel_reason 标记 restored | process_sheet service → cancel_sheet_item / restore_sheet_item |
 | B044 | 工艺单下发后操作列显示"查看"非编辑只读对话框，所有输入框 disabled，保存/上传/新增按钮隐藏 | SheetDetail.vue → isEditing computed |
 | B045 | 工艺单行项目压花图片支持多图上传存储为 JSON 数组，文件名去后缀显示 | SheetDetail.vue + migrate_20260701_pressed_images_json.py |
+| B046 | PDF 图片尺寸：花型颜色图片 86×86，辅料图片 82×82，文字 6pt/55px | pdf_generator.py → _img_tag / _img_cell(size=) |
+| B047 | PDF 工艺说明拼接格式与前端一致：`{spec_name}经编印花{压花/空}毛毯-{包装方式}` | pdf_generator.py + SheetDetail.vue line 744 |
 
 ## API 端点
 
@@ -600,12 +602,13 @@ yarn_plan → weaving → weaving_done → setting → setting_done
 7. 客户打开链接确认 → 版本 V0.5(草稿)，customer_confirmed=True → 企微自动通知指定确认人
 8. 指定确认人逐一点击「内部确认」→ 企微通知进度 → 全部确认完成 → 版本 V1(保存)
 9. （可选）打印工艺单 PDF → 右上角版本号+日期
-10. 下发工艺单 → 工艺单→已下发
-10. 在合同详情中，为行项目下达坯布计划 → 指定外协人员
-11. 生产推进：每工序完成由负责人点击推进 → 企微通知下一工序负责人
-12. 遇到问题时：回退/返工（仅销售经理/生产专员）
-13. 需要取消时：填写原因取消行项目（企微通知，自动快照当前合同版本）
-14. 取消后可点击「恢复」取消的行项目，还原到取消前状态（合同版本变更时提示）
+10. 下发工艺单 → 工艺单→已下发（下发后仍可通过查看按钮浏览行项目只读明细）
+11. 在合同详情中，为行项目下达坯布计划 → 指定外协人员
+12. 生产推进：每工序完成由负责人点击推进 → 企微通知下一工序负责人
+13. 遇到问题时：回退/返工（仅销售经理/生产专员）
+14. 需要取消行项目时：填写原因取消（企微通知，自动快照当前版本）
+15. 取消后可点击「恢复」取消的行项目，还原到取消前状态（合同版本变更时提示）
+16. 工艺单行项目同样支持取消/恢复（草稿状态下操作），压花图片可多选上传
 ```
 
 ### 合同确认流程
@@ -729,6 +732,14 @@ cp .env.example .env
 |------|------|
 | `MYSQL_ROOT_PASSWORD` | MySQL root 密码（首次部署前修改）|
 | `SECRET_KEY` | JWT 签名密钥（首次部署前修改为随机字符串）|
+
+### 服务器信息
+| 项目 | 值 |
+|------|-----|
+| 地址 | 101.43.1.54 |
+| SSH | 使用本机密钥 |
+| 部署路径 | /root/new/repo |
+| 更新 | git pull + docker compose up -d --build |
 
 ### 部署架构
 

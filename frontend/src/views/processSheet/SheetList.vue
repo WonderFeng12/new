@@ -17,19 +17,31 @@
       <el-table-column label="合同号" width="150">
         <template #default="{ row }">{{ row.contract?.contract_no }}</template>
       </el-table-column>
-      <el-table-column label="合同版本" width="90">
+      <el-table-column label="毛毯规格" min-width="200">
+        <template #default="{ row }">
+          {{ specSummary(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="数量" width="80">
+        <template #default="{ row }">
+          {{ totalQty(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="交期" width="100">
+        <template #default="{ row }">
+          {{ firstDelivery(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="合同版本" width="80">
         <template #default="{ row }">V{{ row.confirm_version_no }}</template>
       </el-table-column>
-      <el-table-column label="行项目数" width="80">
-        <template #default="{ row }">{{ row.items?.length || 0 }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="80">
+      <el-table-column label="状态" width="70">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_by" label="创建人" width="100" />
-      <el-table-column prop="created_at" label="创建时间" width="160" />
+      <el-table-column prop="created_by" label="创建人" width="80" />
+      <el-table-column prop="created_at" label="创建时间" width="155" />
       <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="viewDetail(row)">详情</el-button>
@@ -56,6 +68,23 @@ const router = useRouter()
 const sheets = ref([])
 const loading = ref(false)
 const keyword = ref('')
+
+function specSummary(row) {
+  const items = row.items || []
+  if (!items.length) return ''
+  const names = items.map(i => i.spec?.spec_description || i.spec?.spec_name || '').filter(Boolean)
+  return names.join('; ')
+}
+
+function totalQty(row) {
+  const items = row.items || []
+  return items.reduce((s, i) => s + parseFloat(i.qty || 0), 0)
+}
+
+function firstDelivery(row) {
+  const items = row.items || []
+  return items[0]?.delivery_date || ''
+}
 
 function statusType(s) {
   if (s === '草稿') return 'warning'

@@ -91,15 +91,16 @@ def create_spec(db: Session, data: SpecCreate, username: str):
     return spec
 
 
-def update_spec(db: Session, id: int, data: SpecUpdate, username: str):
+def update_spec(db: Session, id: int, data: SpecUpdate, username: str, cascade: bool = False):
     spec = get_spec(db, id)
     if not spec:
         return None
-    if getattr(spec, 'is_in_use', False) or db.query(Contract).filter(
+    in_use = getattr(spec, 'is_in_use', False) or db.query(Contract).filter(
         Contract.spec_id == id, Contract.is_deleted == False,
     ).first() or db.query(ContractItem).filter(
         ContractItem.spec_id == id,
-    ).first():
+    ).first()
+    if in_use and not cascade:
         raise HTTPException(status_code=400, detail="该规格已被合同引用，不可修改")
     update_data = data.model_dump(exclude_unset=True)
     if "length" in update_data:
